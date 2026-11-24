@@ -1,0 +1,22 @@
+.DS_Store
+__pycache__/
+*.pyc
+.env
+.env.*
+.venv/
+tmp/
+.aws/
+.codex/
+.agents/
+*.pdf
+*.ipynb
+gemini-code-*.md
+
+# Local research notes, recordings, and generated review data
+context.pdf
+task.md
+Week*.txt
+wechat_*.png
+input/
+source_media/
+runs/

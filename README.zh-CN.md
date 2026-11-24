@@ -8,7 +8,7 @@
 
 网页和 API 由同一个 FastAPI 应用提供。工作台可通过试用码直接打开本机 `input/audio/trump_victory_speech_65s.mp3` 和已有审校草稿，无须消耗转写与翻译额度；该样本仅供本地开发，不应作为公开演示素材。上传新音频时，可编辑本次术语表。工作台按数字、术语、事实提示和引语标记优先核查段落，可筛选、保存审校并导出 `human_edit_log.csv`。只有服务端保存了全部段落的批准状态、且制作人确认发布时披露 AI 声音，才会接受配音请求。
 
-审校会话目前只保存在运行中的服务进程内存中。重启服务或刷新页面后，未导出的工作无法恢复；这仍是单机开发原型，尚无账号、数据库、跨设备保存或生产级限流。
+审校会话和修改记录保存在数据库中，有效期为七天；本地使用 SQLite，免费托管版使用 Neon PostgreSQL。刷新页面后输入试用码即可继续。原始录音在处理请求结束后删除，如需继续对照收听，请在浏览器中重新选择本地录音。付费转写/翻译和配音调用分别有每日额度，默认每天 20 次和 10 次。当前仍使用团队共用试用码，没有个人账号和逐人审校归属。
 
 本地启动：
 
@@ -16,15 +16,19 @@
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 export DEMO_ACCESS_CODE='自己设置的一串长随机试用码'
-export OPENAI_API_KEY='有效的 OpenAI API Key'
-# 二选一：MiniMax 或 ElevenLabs；OpenAI TTS 可复用上面的 Key
-export MINIMAX_API_KEY='有效的 MiniMax API Key'
+# 选一种：OpenRouter 一把 Key 可用于转写、翻译和默认的 MiniMax 中文配音
+export OPENROUTER_API_KEY='有效的 OpenRouter API Key'
+# 或者使用 OpenAI 转写/翻译，并另配 MiniMax 或 ElevenLabs 配音
+# export OPENAI_API_KEY='有效的 OpenAI API Key'
+# export MINIMAX_API_KEY='有效的 MiniMax API Key'
+export MAX_PREPARES_PER_DAY=20
+export MAX_SYNTHESIS_PER_DAY=10
 .venv/bin/uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
-然后打开 `http://127.0.0.1:8000/app.html`，输入试用码并点击“打开本地演示样本”。只体验审校时不需要 OpenAI 或 TTS API Key；生成配音时仍需要相应服务密钥。网页默认使用 MiniMax 配音；如果只配置了 OpenAI Key，在配音服务中改选 OpenAI。`DEMO_ACCESS_CODE` 是访问限制，不能代替正式的用户认证与用量控制。API Key 只放在服务端环境变量，不要提交到 GitHub，也不要填进网页。
+然后打开 `http://127.0.0.1:8000/app.html`，输入试用码并点击“打开本地演示样本”。只体验审校时不需要 AI 服务密钥。配置 `OPENROUTER_API_KEY` 后，真实上传默认用 OpenRouter 的 Whisper 转写、GPT-6.2 Sol 初译，配音默认用 OpenRouter 的 MiniMax Speech 2.8 HD。也可以在 Render 服务端用 `OPENROUTER_TTS_MODEL` 和 `OPENROUTER_TTS_VOICE` 一起更换模型和声音，例如 `elevenlabs/eleven-v4` 与其支持的声音 ID；需先用同一段审定稿试听。`DEMO_ACCESS_CODE` 是团队共用访问限制，不能代替正式的个人账号认证。API Key 只放在服务端环境变量，不要提交到 GitHub，也不要填进网页。
 
-如果部署到 Vercel，请从 GitHub 导入**仓库根目录**（包含 `app.py`、`pipeline.py`、`requirements.txt` 和 `docs/`），在项目环境变量中配置 `DEMO_ACCESS_CODE`、`OPENAI_API_KEY` 和所选配音服务的密钥。网页通过同域 `/api/prepare` 与 `/api/synthesize` 调用后端。当前上传上限为 4 MB；录音会传给配置的第三方服务。采访敏感内容应先取得编辑部批准和受访者相关授权，再邀请他人试用。
+受控试用版可使用仓库根目录的 `render.yaml` 部署到 **Render 免费 Web Service**。先在 Neon 创建免费 PostgreSQL 项目，再将其连接字符串作为 `DATABASE_URL` 填入 Render；同时填写自己设置的长随机 `DEMO_ACCESS_CODE`。没有数据库连接时服务会拒绝启动，避免免费实例休眠后丢失审校记录和每日额度。在 Render 的 Environment 页面添加 `OPENROUTER_API_KEY`，即可调用转写、翻译和配音；这些调用会消耗 OpenRouter 余额，单纯注册免费账号不等于获得免费转写与配音额度。也可改填 `OPENAI_API_KEY` 并选择相应配音服务。未配置 AI Key 时仍可使用课堂演示，但真实上传无法转写。Render 免费服务闲置后会休眠，首次访问可能较慢；免费额度有限，AI 服务调用可能产生费用。不要把数据库连接字符串、试用码或 API Key 提交到 GitHub。网页通过同域 `/api/prepare` 与 `/api/synthesize` 调用后端。当前上传上限为 4 MB；录音会传给配置的第三方服务。采访敏感内容应先取得编辑部批准和受访者相关授权，再邀请他人试用。
 
 ## 工作流
 

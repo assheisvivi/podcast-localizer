@@ -27,6 +27,7 @@ from urllib.request import Request, urlopen
 
 
 API_BASE = "https://api.openai.com/v1"
+OPENROUTER_API_BASE = "https://openrouter.ai/api/v1"
 MINIMAX_TTS_URL = "https://api.minimax.io/v1/t2a_v2"
 ELEVENLABS_TTS_URL = "https://api.elevenlabs.io/v1/text-to-speech"
 REVIEW_FIELDS = [
@@ -112,6 +113,7 @@ def api_request_multipart(
     file_field: str,
     file_path: Path,
     api_key: str,
+    api_base: str = API_BASE,
 ) -> dict[str, Any]:
     boundary = f"----journalism-ai-{uuid.uuid4().hex}"
     chunks: list[bytes] = []
@@ -140,7 +142,7 @@ def api_request_multipart(
         ]
     )
     request = Request(
-        API_BASE + endpoint,
+        api_base + endpoint,
         data=b"".join(chunks),
         method="POST",
         headers={
@@ -162,7 +164,7 @@ def _open(request: Request) -> bytes:
         raise PipelineError(f"网络请求失败：{exc.reason}") from exc
 
 
-def transcribe(audio_path: Path, model: str, api_key: str) -> dict[str, Any]:
+def transcribe(audio_path: Path, model: str, api_key: str, api_base: str = API_BASE) -> dict[str, Any]:
     return api_request_multipart(
         "/audio/transcriptions",
         [
@@ -175,6 +177,7 @@ def transcribe(audio_path: Path, model: str, api_key: str) -> dict[str, Any]:
         "file",
         audio_path,
         api_key,
+        api_base,
     )
 
 
@@ -299,6 +302,66 @@ def translate_segments(
         return json.loads(output_text)
     except json.JSONDecodeError as exc:
         raise PipelineError(f"翻译接口没有返回有效 JSON：{output_text[:500]}") from exc
+
+
+def translate_segments_openrouter(
+    segments: list[dict[str, Any]],
+    model: str,
+    glossary: list[dict[str, str]],
+    api_key: str,
+    context: str = "",
+) -> dict[str, Any]:
+    schema = {
+        "type": "object",
+        "properties": {"segments": {"type": "array", "items": {
+            "type": "object",
+            "properties": {
+                "segment_id": {"type": "integer"},
+                "translation_zh": {"type": "string"},
+                "fact_flags": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["segment_id", "translation_zh", "fact_flags"],
+            "additionalProperties": False,
+        }}},
+        "required": ["segments"],
+        "additionalProperties": False,
+    }
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": (
+                "你是一名国际新闻编辑和中英翻译。把英文采访或讲话忠实翻译成自然、简洁、适合播客口播的简体中文。"
+                "不得补充原文没有的信息，不得淡化或强化原意；数字、日期、人名、机构名和政治口号必须准确。"
+                "结合全部分段理解上下文，但逐段返回并保持 segment_id 不变。"
+                "无法确认的专名不要猜测，在 fact_flags 中写明需要人工核对的项目；没有疑点时返回空数组。"
+            )},
+            {"role": "user", "content": json.dumps(
+                {"context": context, "glossary": glossary, "segments": segments}, ensure_ascii=False
+            )},
+        ],
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {"name": "journalism_translation", "strict": True, "schema": schema},
+        },
+        "provider": {"require_parameters": True},
+    }
+    try:
+        response = json.loads(post_json(
+            OPENROUTER_API_BASE + "/chat/completions", payload,
+            {"Authorization": f"Bearer {api_key}"},
+        ).decode("utf-8"))
+        message = response["choices"][0]["message"]
+        if message.get("refusal"):
+            raise PipelineError("翻译请求被模型拒绝。")
+        result = json.loads(message["content"])
+        translated = result["segments"]
+        if not isinstance(translated, list) or [item["segment_id"] for item in translated] != [item["segment_id"] for item in segments]:
+            raise ValueError("segment_id 不匹配")
+        if any(not isinstance(item["translation_zh"], str) or not isinstance(item["fact_flags"], list) for item in translated):
+            raise ValueError("字段格式不正确")
+        return result
+    except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise PipelineError("OpenRouter 翻译结果格式不正确，未进入人工审校。") from exc
 
 
 def extract_output_text(response: dict[str, Any]) -> str:
@@ -463,6 +526,40 @@ def synthesize(
             "tts_model": model,
             "voice": voice,
         },
+    )
+
+
+def synthesize_openrouter(
+    review_path: Path,
+    output_path: Path,
+    model: str,
+    voice: str,
+    allow_unreviewed_demo: bool,
+    include_disclosure: bool,
+    api_key: str,
+) -> None:
+    script, pending = build_synthesis_script(
+        review_path, allow_unreviewed_demo, include_disclosure
+    )
+    request = Request(
+        OPENROUTER_API_BASE + "/audio/speech",
+        data=json.dumps({
+            "model": model,
+            "voice": voice,
+            "input": script,
+            "response_format": "mp3",
+        }, ensure_ascii=False).encode("utf-8"),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+    )
+    audio = _open(request)
+    save_synthesis(
+        output_path, script, audio, review_path, pending,
+        allow_unreviewed_demo, include_disclosure,
+        {"tts_backend": "openrouter", "tts_model": model, "voice": voice},
     )
 
 

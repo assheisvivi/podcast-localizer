@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: podcast-localizer-live
+    runtime: python
+    region: singapore
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.5"
+      - key: REQUIRE_PERSISTENT_STORE
+        value: "1"
+      - key: DATABASE_URL
+        sync: false
+      - key: DEMO_ACCESS_CODE
+        sync: false
+      - key: MAX_PREPARES_PER_DAY
+        value: "20"
+      - key: MAX_SYNTHESIS_PER_DAY
+        value: "10"

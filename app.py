@@ -13,6 +13,8 @@ import json
 import os
 import tempfile
 import secrets
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -22,13 +24,19 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 import pipeline
+import review_store
 
 
 ROOT = Path(__file__).resolve().parent
 MAX_AUDIO_BYTES = 4_000_000
 ALLOWED_SUFFIXES = {".mp3", ".m4a", ".wav", ".ogg", ".webm"}
-app = FastAPI(title="Journalism AI Review API", docs_url=None, redoc_url=None)
-SESSIONS: dict[str, dict[str, object]] = {}
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    review_store.ensure_ready()
+    yield
+
+
+app = FastAPI(title="Journalism AI Review API", docs_url=None, redoc_url=None, lifespan=lifespan)
 SAMPLE_AUDIO = ROOT / "input/audio/trump_victory_speech_65s.mp3"
 SAMPLE_REVIEW = ROOT / "runs/trump_demo_local/review.csv"
 
@@ -58,29 +66,44 @@ def qa_flags(row: dict[str, str], glossary: list[dict[str, str]]) -> list[str]:
 def create_session(rows: list[dict[str, str]], glossary: list[dict[str, str]]) -> dict[str, object]:
     session_id = secrets.token_urlsafe(24)
     enriched = [{**row, "qa_flags": qa_flags(row, glossary), "error_type": ""} for row in rows]
-    SESSIONS[session_id] = {"rows": enriched, "glossary": glossary}
+    review_store.create_session(session_id, {"rows": enriched, "glossary": glossary})
     return {"session_id": session_id, "rows": enriched, "segment_count": len(enriched)}
 
 
 def session_rows(session_id: str) -> list[dict[str, str]]:
-    session = SESSIONS.get(session_id)
+    session = review_store.get_session(session_id)
     if session is None:
         raise HTTPException(404, "Review session expired. Open the sample or upload audio again.")
     return session["rows"]
 
 
+def consume_quota(action: str, environment_name: str, default: int) -> None:
+    try:
+        limit = max(0, int(os.environ.get(environment_name, str(default))))
+    except ValueError as exc:
+        raise HTTPException(503, f"Invalid {environment_name} configuration.") from exc
+    if not review_store.consume_daily_quota(action, limit):
+        now = datetime.now(timezone.utc)
+        tomorrow = datetime.combine(now.date() + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
+        raise HTTPException(
+            429,
+            "Daily processing limit reached. Try again tomorrow (UTC).",
+            headers={"Retry-After": str(max(1, int((tomorrow - now).total_seconds())))},
+        )
+
+
 class ReviewRow(BaseModel):
-    segment_id: str
-    start_sec: str
-    end_sec: str
-    duration_sec: str
-    english_transcript: str
-    editor_english_transcript: str = ""
-    ai_translation_zh: str
-    editor_translation_zh: str = ""
+    segment_id: str = Field(max_length=32)
+    start_sec: str = Field(max_length=32)
+    end_sec: str = Field(max_length=32)
+    duration_sec: str = Field(max_length=32)
+    english_transcript: str = Field(max_length=10000)
+    editor_english_transcript: str = Field(default="", max_length=10000)
+    ai_translation_zh: str = Field(max_length=10000)
+    editor_translation_zh: str = Field(default="", max_length=10000)
     review_status: str = "needs_review"
-    editor_notes: str = ""
-    error_type: str = ""
+    editor_notes: str = Field(default="", max_length=2000)
+    error_type: str = Field(default="", max_length=32)
 
 
 class SynthesizeRequest(BaseModel):
@@ -113,14 +136,18 @@ def public_error(exc: pipeline.PipelineError) -> HTTPException:
 
 @app.get("/api/health")
 def health() -> dict[str, object]:
+    ai_key_available = bool(os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY", "").startswith("sk-"))
     return {
         "status": "ok",
-        "processing_enabled": bool(os.environ.get("DEMO_ACCESS_CODE")),
-        "transcription_enabled": bool(os.environ.get("OPENAI_API_KEY", "").startswith("sk-")),
+        "review_storage": review_store.backend(),
+        "processing_enabled": bool(os.environ.get("DEMO_ACCESS_CODE") and ai_key_available),
+        "sample_available": SAMPLE_AUDIO.exists() and SAMPLE_REVIEW.exists(),
+        "transcription_enabled": ai_key_available,
         "tts_backends": {
             "minimax": bool(os.environ.get("MINIMAX_API_KEY")),
             "openai": bool(os.environ.get("OPENAI_API_KEY", "").startswith("sk-")),
             "elevenlabs": bool(os.environ.get("ELEVENLABS_API_KEY") and os.environ.get("ELEVENLABS_VOICE_ID")),
+            "openrouter": bool(os.environ.get("OPENROUTER_API_KEY")),
         },
     }
 
@@ -141,8 +168,11 @@ async def prepare(
         raise HTTPException(415, "Upload MP3, M4A, WAV, OGG, or WebM audio.")
     if len(context) > 1000:
         raise HTTPException(400, "Editorial context must be under 1,000 characters.")
+    if len(glossary_json) > 20000:
+        raise HTTPException(400, "Glossary is too long.")
     try:
-        key = pipeline.require_api_key()
+        use_openrouter = bool(os.environ.get("OPENROUTER_API_KEY"))
+        key = pipeline.require_env_key("OPENROUTER_API_KEY") if use_openrouter else pipeline.require_api_key()
     except pipeline.PipelineError as exc:
         raise public_error(exc) from exc
     try:
@@ -162,12 +192,23 @@ async def prepare(
                 target.write(chunk)
         if total < 1024:
             raise HTTPException(400, "Audio file is empty or too small.")
+        consume_quota("prepare", "MAX_PREPARES_PER_DAY", 20)
         try:
-            transcript = pipeline.transcribe(audio_path, "whisper-1", key)
-            segments = pipeline.extract_segments(transcript)
-            translation = pipeline.translate_segments(
-                segments, "gpt-5-mini", glossary, key, context
+            transcript = pipeline.transcribe(
+                audio_path,
+                "openai/whisper-1" if use_openrouter else "whisper-1",
+                key,
+                pipeline.OPENROUTER_API_BASE if use_openrouter else pipeline.API_BASE,
             )
+            segments = pipeline.extract_segments(transcript)
+            if use_openrouter:
+                translation = pipeline.translate_segments_openrouter(
+                    segments, os.environ.get("OPENROUTER_TRANSLATION_MODEL", "openai/gpt-6.2-sol"), glossary, key, context
+                )
+            else:
+                translation = pipeline.translate_segments(
+                    segments, "gpt-5-mini", glossary, key, context
+                )
             rows = pipeline.build_review_rows(segments, translation)
         except pipeline.PipelineError as exc:
             raise public_error(exc) from exc
@@ -200,6 +241,12 @@ def sample_audio(x_demo_access_code: Optional[str] = Header(default=None)) -> Re
     return FileResponse(SAMPLE_AUDIO, media_type="audio/mpeg", headers={"Cache-Control": "no-store"})
 
 
+@app.get("/api/session/{session_id}")
+def resume_session(session_id: str, x_demo_access_code: Optional[str] = Header(default=None)) -> dict[str, object]:
+    require_demo_access(x_demo_access_code)
+    return {"session_id": session_id, "rows": session_rows(session_id)}
+
+
 @app.post("/api/review")
 def review(request: ReviewRequest, x_demo_access_code: Optional[str] = Header(default=None)) -> dict[str, object]:
     require_demo_access(x_demo_access_code)
@@ -207,17 +254,31 @@ def review(request: ReviewRequest, x_demo_access_code: Optional[str] = Header(de
     if len(originals) != len(request.rows):
         raise HTTPException(400, "Review segment count does not match.")
     updated = []
+    changes = []
     for original, model in zip(originals, request.rows):
         row = model.model_dump()
-        if row["segment_id"] != original["segment_id"] or row["english_transcript"] != original["english_transcript"] or row["ai_translation_zh"] != original["ai_translation_zh"]:
+        immutable = ("segment_id", "start_sec", "end_sec", "duration_sec", "english_transcript", "ai_translation_zh")
+        if any(row[key] != original[key] for key in immutable):
             raise HTTPException(400, "The source draft changed. Review it again.")
         if row["review_status"] not in {"approved", "needs_review"}:
             raise HTTPException(400, "Invalid review status.")
         if row["review_status"] == "approved" and not row["editor_translation_zh"].strip():
             raise HTTPException(400, "Enter final Chinese text before approval.")
-        updated.append({**original, **row})
-    SESSIONS[request.session_id]["rows"] = updated
+        changed = {**original, **row}
+        updated.append(changed)
+        if changed != original:
+            changes.append((row["segment_id"], original, changed))
+    session = review_store.get_session(request.session_id)
+    if session is None or not review_store.update_session(request.session_id, {**session, "rows": updated}, changes):
+        raise HTTPException(404, "Review session expired. Open the sample or upload audio again.")
     return {"approved": sum(r["review_status"] == "approved" for r in updated), "total": len(updated)}
+
+
+@app.get("/api/review-history/{session_id}")
+def review_history(session_id: str, x_demo_access_code: Optional[str] = Header(default=None)) -> dict[str, object]:
+    require_demo_access(x_demo_access_code)
+    session_rows(session_id)
+    return {"events": review_store.review_events(session_id)}
 
 
 @app.get("/api/audit/{session_id}")
@@ -246,8 +307,22 @@ def synthesize(
         raise HTTPException(400, "Complete and approve every Chinese segment first.")
     if sum(len(row["editor_translation_zh"]) for row in rows) > 5000:
         raise HTTPException(400, "Chinese script is too long; this prototype accepts up to 5,000 characters.")
-    if request.backend not in {"minimax", "openai", "elevenlabs"}:
+    if request.backend not in {"minimax", "openai", "elevenlabs", "openrouter"}:
         raise HTTPException(400, "Unsupported voice service.")
+    try:
+        if request.backend == "minimax":
+            provider_key = pipeline.require_env_key("MINIMAX_API_KEY")
+        elif request.backend == "openai":
+            provider_key = pipeline.require_api_key()
+        elif request.backend == "openrouter":
+            provider_key = pipeline.require_env_key("OPENROUTER_API_KEY")
+        else:
+            provider_key = pipeline.require_env_key("ELEVENLABS_API_KEY")
+            if not os.environ.get("ELEVENLABS_VOICE_ID"):
+                raise pipeline.PipelineError("未检测到 ELEVENLABS_VOICE_ID。")
+    except pipeline.PipelineError as exc:
+        raise public_error(exc) from exc
+    consume_quota("synthesize", "MAX_SYNTHESIS_PER_DAY", 10)
     with tempfile.TemporaryDirectory(prefix="journalism-ai-web-") as directory:
         review_path = Path(directory) / "review.csv"
         output_path = Path(directory) / "chinese_audio.mp3"
@@ -257,18 +332,25 @@ def synthesize(
                 pipeline.synthesize_minimax(
                     review_path, output_path, "speech-2.8-hd",
                     request.voice or "male-qn-qingse", 0.96, False, True,
-                    pipeline.require_env_key("MINIMAX_API_KEY"),
+                    provider_key,
                 )
             elif request.backend == "openai":
                 pipeline.synthesize(
                     review_path, output_path, "gpt-4o-mini-tts",
-                    request.voice or "cedar", False, True, pipeline.require_api_key(),
+                    request.voice or "cedar", False, True, provider_key,
+                )
+            elif request.backend == "openrouter":
+                pipeline.synthesize_openrouter(
+                    review_path, output_path,
+                    os.environ.get("OPENROUTER_TTS_MODEL", "minimax/speech-2.8-hd"),
+                    request.voice or os.environ.get("OPENROUTER_TTS_VOICE", "male-qn-qingse"),
+                    False, True, provider_key,
                 )
             else:
                 pipeline.synthesize_elevenlabs(
                     review_path, output_path, "eleven_v4",
                     os.environ.get("ELEVENLABS_VOICE_ID", ""), False, True,
-                    pipeline.require_env_key("ELEVENLABS_API_KEY"),
+                    provider_key,
                 )
         except pipeline.PipelineError as exc:
             raise public_error(exc) from exc
