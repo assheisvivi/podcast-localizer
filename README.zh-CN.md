@@ -26,9 +26,9 @@ export MAX_SYNTHESIS_PER_DAY=10
 .venv/bin/uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
-然后打开 `http://127.0.0.1:8000/app.html`，输入试用码并点击“打开本地演示样本”。只体验审校时不需要 AI 服务密钥。配置 `OPENROUTER_API_KEY` 后，真实上传默认用 OpenRouter 的 Whisper 转写、GPT-6.2 Sol 初译，配音默认用 OpenRouter 的 MiniMax Speech 2.8 HD。也可以在 Render 服务端用 `OPENROUTER_TTS_MODEL` 和 `OPENROUTER_TTS_VOICE` 一起更换模型和声音，例如 `elevenlabs/eleven-v4` 与其支持的声音 ID；需先用同一段审定稿试听。`DEMO_ACCESS_CODE` 是团队共用访问限制，不能代替正式的个人账号认证。API Key 只放在服务端环境变量，不要提交到 GitHub，也不要填进网页。
+然后打开 `http://127.0.0.1:8000/app.html`，输入试用码并点击“打开本地演示样本”。只体验审校时不需要 AI 服务密钥。配置 `OPENROUTER_API_KEY` 后，真实上传默认用 Mistral Voxtral Small Transcribe 3 转写、Qwen3.8 2.4T A95B 初译，配音默认用 MiniMax Speech 2.8 HD。这组模型避开了部分账户的 OpenAI 模型访问限制。可在 Render 服务端用 `OPENROUTER_TRANSCRIPTION_MODEL`、`OPENROUTER_TRANSLATION_MODEL`、`OPENROUTER_TTS_MODEL` 和 `OPENROUTER_TTS_VOICE` 调整模型与声音；请用同一段审定稿试听后再决定。`DEMO_ACCESS_CODE` 是团队共用访问限制，不能代替正式的个人账号认证。API Key 只放在服务端环境变量，不要提交到 GitHub，也不要填进网页。
 
-受控试用版可使用仓库根目录的 `render.yaml` 部署到 **Render 免费 Web Service**。先在 Neon 创建免费 PostgreSQL 项目，再将其连接字符串作为 `DATABASE_URL` 填入 Render；同时填写自己设置的长随机 `DEMO_ACCESS_CODE`。没有数据库连接时服务会拒绝启动，避免免费实例休眠后丢失审校记录和每日额度。在 Render 的 Environment 页面添加 `OPENROUTER_API_KEY`，即可调用转写、翻译和配音；这些调用会消耗 OpenRouter 余额，单纯注册免费账号不等于获得免费转写与配音额度。也可改填 `OPENAI_API_KEY` 并选择相应配音服务。未配置 AI Key 时仍可使用课堂演示，但真实上传无法转写。Render 免费服务闲置后会休眠，首次访问可能较慢；免费额度有限，AI 服务调用可能产生费用。不要把数据库连接字符串、试用码或 API Key 提交到 GitHub。网页通过同域 `/api/prepare` 与 `/api/synthesize` 调用后端。当前上传上限为 4 MB；录音会传给配置的第三方服务。采访敏感内容应先取得编辑部批准和受访者相关授权，再邀请他人试用。
+受控试用版可使用仓库根目录的 `render.yaml` 部署到 **Render 免费 Web Service**。先在 Neon 创建免费 PostgreSQL 项目，再将其连接字符串作为 `DATABASE_URL` 填入 Render；同时填写自己设置的长随机 `DEMO_ACCESS_CODE`。没有数据库连接时服务会拒绝启动，避免免费实例休眠后丢失审校记录和每日额度。在 Render 的 Environment 页面添加 `OPENROUTER_API_KEY`，即可配置转写、翻译和配音；三项调用均需要可用的 OpenRouter 余额，单纯注册免费账号或创建 Key 不等于获得额度。也可改填 `OPENAI_API_KEY` 并选择相应配音服务。没有可用 AI 额度时仍可使用课堂演示，但真实上传无法完成处理。Render 免费服务闲置后会休眠，首次访问可能较慢；免费额度有限，AI 服务调用可能产生费用。不要把数据库连接字符串、试用码或 API Key 提交到 GitHub。网页通过同域 `/api/prepare` 与 `/api/synthesize` 调用后端。当前上传上限为 4 MB；录音会传给配置的第三方服务。采访敏感内容应先取得编辑部批准和受访者相关授权，再邀请他人试用。
 
 ## 工作流
 

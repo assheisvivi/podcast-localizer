@@ -129,6 +129,12 @@ def require_demo_access(code: Optional[str]) -> None:
 def public_error(exc: pipeline.PipelineError) -> HTTPException:
     # Provider errors can include request details; keep those out of responses.
     message = str(exc)
+    if "HTTP 402" in message:
+        return HTTPException(402, "The AI account has no available credits. The classroom demo is still available.")
+    if "HTTP 403" in message:
+        return HTTPException(403, "The AI account cannot use the selected model. Ask the owner to check provider access.")
+    if "HTTP 401" in message:
+        return HTTPException(503, "The AI service key is invalid or has expired. Ask the owner to update it.")
     if message.startswith(("未检测到", "OPENAI_API_KEY 看起来", "审校表", "至少有一行")):
         return HTTPException(503, "The speech or translation service is not configured.")
     return HTTPException(502, "The upstream service failed. Please try again later.")
@@ -196,14 +202,14 @@ async def prepare(
         try:
             transcript = pipeline.transcribe(
                 audio_path,
-                "openai/whisper-1" if use_openrouter else "whisper-1",
+                os.environ.get("OPENROUTER_TRANSCRIPTION_MODEL", "mistralai/voxtral-small-transcribe-3-0") if use_openrouter else "whisper-1",
                 key,
                 pipeline.OPENROUTER_API_BASE if use_openrouter else pipeline.API_BASE,
             )
             segments = pipeline.extract_segments(transcript)
             if use_openrouter:
                 translation = pipeline.translate_segments_openrouter(
-                    segments, os.environ.get("OPENROUTER_TRANSLATION_MODEL", "openai/gpt-6.2-sol"), glossary, key, context
+                    segments, os.environ.get("OPENROUTER_TRANSLATION_MODEL", "qwen/qwen3.8-2.4t-a95b"), glossary, key, context
                 )
             else:
                 translation = pipeline.translate_segments(
