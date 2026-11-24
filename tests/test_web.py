@@ -36,11 +36,11 @@ class WebApiTests(unittest.TestCase):
                 web.require_demo_access("wrong")
         self.assertEqual(caught.exception.status_code, 401)
 
-    def test_health_marks_live_upload_unavailable_without_api_credit(self):
+    def test_health_marks_live_upload_unconfigured_without_api_key(self):
         with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret", "OPENAI_API_KEY": "", "OPENROUTER_API_KEY": ""}):
             self.assertFalse(web.health()["processing_enabled"])
 
-    def test_openrouter_key_enables_live_processing(self):
+    def test_openrouter_key_marks_live_processing_configured(self):
         with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret", "OPENAI_API_KEY": "", "OPENROUTER_API_KEY": "sk-or-test"}):
             health = web.health()
         self.assertTrue(health["processing_enabled"])
@@ -55,9 +55,28 @@ class WebApiTests(unittest.TestCase):
              patch.object(web.pipeline, "translate_segments_openrouter", return_value=translation) as translate:
             result = asyncio.run(web.prepare(audio=audio, context="", glossary_json="[]", authorized=True, x_demo_access_code="secret"))
         self.assertEqual(result["segment_count"], 1)
-        self.assertEqual(transcribe.call_args.args[1], "openai/whisper-1")
+        self.assertEqual(transcribe.call_args.args[1], "mistralai/voxtral-small-transcribe-3-0")
         self.assertEqual(transcribe.call_args.args[3], web.pipeline.OPENROUTER_API_BASE)
-        self.assertEqual(translate.call_args.args[1], "openai/gpt-6.2-sol")
+        self.assertEqual(translate.call_args.args[1], "qwen/qwen3.8-2.4t-a95b")
+
+    def test_openrouter_model_overrides(self):
+        audio = UploadFile(file=io.BytesIO(b"a" * 2000), filename="clip.mp3")
+        transcript = {"segments": [{"id": 0, "start": 0, "end": 3, "text": "Hello."}]}
+        translation = {"segments": [{"segment_id": 0, "translation_zh": "你好。", "fact_flags": []}]}
+        with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret", "OPENROUTER_API_KEY": "sk-or-test", "OPENROUTER_TRANSCRIPTION_MODEL": "vendor/stt", "OPENROUTER_TRANSLATION_MODEL": "vendor/translate"}), \
+             patch.object(web.pipeline, "transcribe", return_value=transcript) as transcribe, \
+             patch.object(web.pipeline, "translate_segments_openrouter", return_value=translation) as translate:
+            asyncio.run(web.prepare(audio=audio, context="", glossary_json="[]", authorized=True, x_demo_access_code="secret"))
+        self.assertEqual(transcribe.call_args.args[1], "vendor/stt")
+        self.assertEqual(translate.call_args.args[1], "vendor/translate")
+
+    def test_provider_credit_and_access_errors_are_safe_and_actionable(self):
+        cases = [("HTTP 402", 402, "no available credits"), ("HTTP 403", 403, "cannot use"), ("HTTP 401", 503, "invalid")]
+        for code, expected_status, expected_message in cases:
+            error = web.public_error(web.pipeline.PipelineError(f"API 请求失败（{code}）：secret provider detail"))
+            self.assertEqual(error.status_code, expected_status)
+            self.assertIn(expected_message, error.detail)
+            self.assertNotIn("secret provider detail", error.detail)
 
     def test_prepare_returns_unapproved_rows_without_persisting_audio(self):
         audio = UploadFile(file=io.BytesIO(b"a" * 2000), filename="clip.mp3")
