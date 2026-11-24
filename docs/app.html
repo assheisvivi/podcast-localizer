@@ -61,8 +61,8 @@
       <div id="resume-panel" hidden><p>A saved review is available for seven days. Enter your access code to continue. Your recording is not stored; select it again below if you need to listen while editing.</p><div class="actions"><button id="resume-button" class="secondary" type="button">Continue saved review</button><label for="resume-audio-file">Reattach source audio (optional)</label><input id="resume-audio-file" type="file" accept="audio/*,.mp3,.m4a,.wav,.ogg,.webm"></div></div>
       <form id="upload-form">
         <p><button id="classroom-button" class="secondary" type="button">Explore classroom demo</button> <span class="hint">Fictional sample · no API key or access code</span></p>
-        <p class="hint">The published GitHub Pages version runs this classroom demo. Processing your own audio requires the separately hosted Python service.</p>
-        <details id="live-options"><summary>Use your own audio or the local development sample</summary>
+        <p class="hint">The classroom demo also works on GitHub Pages. To process your own audio, open the <a href="https://podcast-localizer-live.onrender.com/app.html">hosted workspace</a> and enter the access code provided by the project owner.</p>
+        <details id="live-options"><summary>Use your own audio</summary>
         <div class="grid"><div><label for="access-code">Access code</label><input id="access-code" type="password" autocomplete="off"><div class="hint">Provided by the project owner. It is not stored in your browser.</div></div><div><label for="audio-file">English audio</label><input id="audio-file" type="file" accept="audio/*,.mp3,.m4a,.wav,.ogg,.webm"><div class="hint">Up to 4 MB; use a clip of about one minute.</div></div></div>
         <p style="margin-top:16px"><button id="sample-button" class="secondary" type="button">Open local development sample</button></p>
         <label for="context" style="margin-top:18px">Editorial context (optional)</label><textarea id="context" maxlength="1000" placeholder="Speaker, topic, and names to check. Avoid sensitive material unless cleared for third-party processing."></textarea>
@@ -172,7 +172,7 @@
       } catch(error){setStatus('synthesis-status',error.message||'Synthesis failed','error');}
       finally {updateProgress();}
     });
-    fetch('/api/health').then(r=>r.json()).then(data=>{if(!data.processing_enabled)setStatus('prepare-status','The API is not configured. The classroom demo is ready to use.');if(!data.sample_available)$('sample-button').hidden=true;if(data.tts_backends?.openrouter)$('backend').value='openrouter';else if(data.tts_backends?.minimax)$('backend').value='minimax';else if(data.tts_backends?.openai)$('backend').value='openai';else if(data.tts_backends?.elevenlabs)$('backend').value='elevenlabs';}).catch(()=>setStatus('prepare-status','Classroom demo is ready. Live processing requires the Python API.'));
+    fetch('/api/health').then(r=>r.json()).then(data=>{setStatus('prepare-status',data.processing_enabled?'Live processing is configured. Provider credit and model access are required when you submit.':'The API is not configured. The classroom demo is ready to use.');if(!data.sample_available)$('sample-button').hidden=true;if(data.tts_backends?.openrouter)$('backend').value='openrouter';else if(data.tts_backends?.minimax)$('backend').value='minimax';else if(data.tts_backends?.openai)$('backend').value='openai';else if(data.tts_backends?.elevenlabs)$('backend').value='elevenlabs';}).catch(()=>setStatus('prepare-status','Classroom demo is ready. Live processing requires the Python API.'));
   </script>
 </body>
 </html>
