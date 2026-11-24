@@ -53,6 +53,27 @@ class PipelineTests(unittest.TestCase):
             pipeline.transcribe(Path("clip.mp3"), "whisper-1", "sk-test")
         self.assertIn(("timestamp_granularities[]", "word"), request.call_args.args[1])
 
+    def test_openrouter_translation_keeps_segment_ids_and_strict_schema(self):
+        segments = [{"segment_id": 3, "start": 0, "end": 2, "text": "Hello."}]
+        answer = {"choices": [{"message": {"content": json.dumps({"segments": [
+            {"segment_id": 3, "translation_zh": "你好。", "fact_flags": []}
+        ]})}}]}
+        with patch.object(pipeline, "post_json", return_value=json.dumps(answer).encode()) as request:
+            result = pipeline.translate_segments_openrouter(segments, "openai/gpt-6.2-sol", [], "key")
+        self.assertEqual(result["segments"][0]["translation_zh"], "你好。")
+        self.assertEqual(request.call_args.args[0], pipeline.OPENROUTER_API_BASE + "/chat/completions")
+        self.assertTrue(request.call_args.args[1]["provider"]["require_parameters"])
+        self.assertEqual(request.call_args.args[1]["response_format"]["type"], "json_schema")
+
+    def test_openrouter_translation_rejects_changed_segment_id(self):
+        segments = [{"segment_id": 3, "start": 0, "end": 2, "text": "Hello."}]
+        answer = {"choices": [{"message": {"content": json.dumps({"segments": [
+            {"segment_id": 4, "translation_zh": "你好。", "fact_flags": []}
+        ]})}}]}
+        with patch.object(pipeline, "post_json", return_value=json.dumps(answer).encode()):
+            with self.assertRaises(pipeline.PipelineError):
+                pipeline.translate_segments_openrouter(segments, "openai/gpt-6.2-sol", [], "key")
+
     def test_build_review_rows_starts_unapproved(self):
         rows = pipeline.build_review_rows(
             [{"segment_id": 3, "start": 2, "end": 4, "text": "Example."}],
@@ -119,6 +140,18 @@ class PipelineTests(unittest.TestCase):
                 )
             self.assertEqual(output.read_bytes(), fake_audio)
             self.assertIn("voice%2Fid", request.call_args.args[0])
+
+    def test_openrouter_voice_generates_approved_mp3(self):
+        fake_audio = b"ID3" + b"z" * 1_100
+        with tempfile.TemporaryDirectory() as directory:
+            review = self.write_approved_review(directory)
+            output = Path(directory) / "openrouter.mp3"
+            with patch.object(pipeline, "_open", return_value=fake_audio) as request:
+                pipeline.synthesize_openrouter(
+                    review, output, "minimax/speech-2.8-hd", "male-qn-qingse", False, True, "key"
+                )
+            self.assertEqual(output.read_bytes(), fake_audio)
+            self.assertEqual(request.call_args.args[0].full_url, pipeline.OPENROUTER_API_BASE + "/audio/speech")
 
     def test_provider_key_is_required(self):
         with patch.dict(os.environ, {}, clear=True):

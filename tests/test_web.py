@@ -9,6 +9,7 @@ from unittest.mock import patch
 from fastapi import HTTPException, UploadFile
 
 import app as web
+import review_store_postgres
 
 
 def review_row(status="needs_review", final=""):
@@ -20,17 +21,49 @@ def review_row(status="needs_review", final=""):
 
 
 class WebApiTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.database_env = patch.dict(os.environ, {"SESSION_DB_PATH": os.path.join(self.directory.name, "reviews.sqlite3")})
+        self.database_env.start()
+
+    def tearDown(self):
+        self.database_env.stop()
+        self.directory.cleanup()
+
     def test_access_code_is_required(self):
         with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret"}):
             with self.assertRaises(HTTPException) as caught:
                 web.require_demo_access("wrong")
         self.assertEqual(caught.exception.status_code, 401)
 
+    def test_health_marks_live_upload_unavailable_without_api_credit(self):
+        with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret", "OPENAI_API_KEY": "", "OPENROUTER_API_KEY": ""}):
+            self.assertFalse(web.health()["processing_enabled"])
+
+    def test_openrouter_key_enables_live_processing(self):
+        with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret", "OPENAI_API_KEY": "", "OPENROUTER_API_KEY": "sk-or-test"}):
+            health = web.health()
+        self.assertTrue(health["processing_enabled"])
+        self.assertTrue(health["tts_backends"]["openrouter"])
+
+    def test_prepare_routes_to_openrouter_when_configured(self):
+        audio = UploadFile(file=io.BytesIO(b"a" * 2000), filename="clip.mp3")
+        transcript = {"segments": [{"id": 0, "start": 0, "end": 3, "text": "Hello."}]}
+        translation = {"segments": [{"segment_id": 0, "translation_zh": "你好。", "fact_flags": []}]}
+        with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret", "OPENROUTER_API_KEY": "sk-or-test"}), \
+             patch.object(web.pipeline, "transcribe", return_value=transcript) as transcribe, \
+             patch.object(web.pipeline, "translate_segments_openrouter", return_value=translation) as translate:
+            result = asyncio.run(web.prepare(audio=audio, context="", glossary_json="[]", authorized=True, x_demo_access_code="secret"))
+        self.assertEqual(result["segment_count"], 1)
+        self.assertEqual(transcribe.call_args.args[1], "openai/whisper-1")
+        self.assertEqual(transcribe.call_args.args[3], web.pipeline.OPENROUTER_API_BASE)
+        self.assertEqual(translate.call_args.args[1], "openai/gpt-6.2-sol")
+
     def test_prepare_returns_unapproved_rows_without_persisting_audio(self):
         audio = UploadFile(file=io.BytesIO(b"a" * 2000), filename="clip.mp3")
         transcript = {"segments": [{"id": 0, "start": 0, "end": 3, "text": "Hello."}]}
         translation = {"segments": [{"segment_id": 0, "translation_zh": "你好。", "fact_flags": []}]}
-        with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret", "OPENAI_API_KEY": "sk-test"}), \
+        with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret", "OPENAI_API_KEY": "sk-test", "OPENROUTER_API_KEY": ""}), \
              patch.object(web.pipeline, "transcribe", return_value=transcript), \
              patch.object(web.pipeline, "translate_segments", return_value=translation) as translate:
             result = asyncio.run(web.prepare(audio=audio, context="A short interview", glossary_json="[]", authorized=True, x_demo_access_code="secret"))
@@ -41,7 +74,7 @@ class WebApiTests(unittest.TestCase):
 
     def test_prepare_rejects_oversize_audio_before_provider_call(self):
         audio = UploadFile(file=io.BytesIO(b"a" * (web.MAX_AUDIO_BYTES + 1)), filename="clip.mp3")
-        with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret", "OPENAI_API_KEY": "sk-test"}), \
+        with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret", "OPENAI_API_KEY": "sk-test", "OPENROUTER_API_KEY": ""}), \
              patch.object(web.pipeline, "transcribe") as transcribe:
             with self.assertRaises(HTTPException) as caught:
                 asyncio.run(web.prepare(audio=audio, context="", glossary_json="[]", authorized=True, x_demo_access_code="secret"))
@@ -69,6 +102,20 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual(response.media_type, "audio/mpeg")
         self.assertTrue(response.body.startswith(b"ID3"))
 
+    def test_approved_rows_can_use_openrouter_voice(self):
+        def fake_synthesis(review_path, output_path, *args):
+            output_path.write_bytes(b"ID3" + b"x" * 1200)
+
+        session = web.create_session([review_row().model_dump()], [])
+        with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret", "OPENROUTER_API_KEY": "sk-or-test"}), \
+             patch.object(web.pipeline, "synthesize_openrouter", side_effect=fake_synthesis) as voice:
+            web.review(web.ReviewRequest(session_id=session["session_id"], rows=[review_row(status="approved", final="你好。")]), "secret")
+            response = web.synthesize(web.SynthesizeRequest(
+                session_id=session["session_id"], backend="openrouter", disclosure_confirmed=True
+            ), "secret")
+        self.assertEqual(response.media_type, "audio/mpeg")
+        self.assertEqual(voice.call_args.args[2:4], ("minimax/speech-2.8-hd", "male-qn-qingse"))
+
     def test_qa_flags_numbers_and_glossary(self):
         row = review_row().model_dump()
         row.update(english_transcript="The U.S. has 47 sanctions.", ai_translation_zh="美国有46项限制。")
@@ -94,6 +141,58 @@ class WebApiTests(unittest.TestCase):
         session = web.create_session([review_row().model_dump()], [])
         changed = review_row(status="approved", final="你好。")
         changed.ai_translation_zh = "被替换的初译"
+        with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret"}), self.assertRaises(HTTPException) as caught:
+            web.review(web.ReviewRequest(session_id=session["session_id"], rows=[changed]), "secret")
+        self.assertEqual(caught.exception.status_code, 400)
+
+    def test_saved_review_and_edit_history_survive_new_database_connection(self):
+        session = web.create_session([review_row().model_dump()], [])
+        with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret"}):
+            web.review(web.ReviewRequest(session_id=session["session_id"], rows=[review_row(status="approved", final="你好。")]), "secret")
+            restored = web.resume_session(session["session_id"], "secret")
+            history = web.review_history(session["session_id"], "secret")
+        self.assertEqual(restored["rows"][0]["review_status"], "approved")
+        self.assertEqual(history["events"][0]["after"]["editor_translation_zh"], "你好。")
+
+    def test_daily_prepare_quota_blocks_provider_call(self):
+        audio = UploadFile(file=io.BytesIO(b"a" * 2000), filename="clip.mp3")
+        with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret", "OPENAI_API_KEY": "sk-test", "MAX_PREPARES_PER_DAY": "0"}), \
+             patch.object(web.pipeline, "transcribe") as transcribe:
+            with self.assertRaises(HTTPException) as caught:
+                asyncio.run(web.prepare(audio=audio, context="", glossary_json="[]", authorized=True, x_demo_access_code="secret"))
+        self.assertEqual(caught.exception.status_code, 429)
+        transcribe.assert_not_called()
+
+    def test_daily_quota_is_persistent(self):
+        self.assertTrue(web.review_store.consume_daily_quota("prepare", 1))
+        self.assertFalse(web.review_store.consume_daily_quota("prepare", 1))
+
+    def test_hosted_mode_requires_persistent_database(self):
+        with patch.dict(os.environ, {"DATABASE_URL": "", "REQUIRE_PERSISTENT_STORE": "1"}):
+            with self.assertRaisesRegex(RuntimeError, "DATABASE_URL"):
+                web.review_store.ensure_ready()
+        with patch.dict(os.environ, {"DATABASE_URL": "postgresql://example", "REQUIRE_PERSISTENT_STORE": "1"}):
+            self.assertEqual(web.review_store.backend(), "postgres")
+
+    def test_zero_postgres_quota_never_connects(self):
+        with patch.object(review_store_postgres, "database") as database:
+            self.assertFalse(review_store_postgres.consume_daily_quota("prepare", 0))
+        database.assert_not_called()
+
+    def test_daily_synthesis_quota_blocks_voice_provider(self):
+        session = web.create_session([review_row().model_dump()], [])
+        with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret", "MINIMAX_API_KEY": "test", "MAX_SYNTHESIS_PER_DAY": "0"}), \
+             patch.object(web.pipeline, "synthesize_minimax") as voice:
+            web.review(web.ReviewRequest(session_id=session["session_id"], rows=[review_row(status="approved", final="你好。")]), "secret")
+            with self.assertRaises(HTTPException) as caught:
+                web.synthesize(web.SynthesizeRequest(session_id=session["session_id"], disclosure_confirmed=True), "secret")
+        self.assertEqual(caught.exception.status_code, 429)
+        voice.assert_not_called()
+
+    def test_review_rejects_tampered_timestamps(self):
+        session = web.create_session([review_row().model_dump()], [])
+        changed = review_row(status="approved", final="你好。")
+        changed.start_sec = "999.000"
         with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret"}), self.assertRaises(HTTPException) as caught:
             web.review(web.ReviewRequest(session_id=session["session_id"], rows=[changed]), "secret")
         self.assertEqual(caught.exception.status_code, 400)
