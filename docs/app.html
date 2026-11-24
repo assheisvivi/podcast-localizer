@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Human-gated podcast localization review workspace.">
+  <title>Review Workspace · Podcast Localizer</title>
+  <style>
+    :root { --ink:#172a31; --muted:#52666b; --paper:#f6f3ec; --line:#d5d9d3; --accent:#b54131; --teal:#1e625e; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink); font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; line-height:1.6; }
+    .wrap { max-width:1100px; margin:auto; padding:0 24px; }
+    header { border-bottom:1px solid var(--line); }
+    header .wrap { display:flex; justify-content:space-between; align-items:center; padding-top:20px; padding-bottom:20px; gap:20px; }
+    a { color:var(--teal); }
+    .brand { color:var(--ink); font-weight:800; text-decoration:none; }
+    h1 { font-size:clamp(32px,4.5vw,54px); line-height:1.15; letter-spacing:-.04em; margin:0 0 12px; }
+    h2 { margin:0 0 12px; font-size:23px; }
+    p { margin:0 0 16px; }
+    .intro { padding:55px 0 28px; }
+    .intro p { max-width:730px; color:var(--muted); }
+    .panel { background:#fffdf9; border:1px solid var(--line); padding:28px; margin-bottom:24px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    label { display:block; font-size:14px; font-weight:700; margin-bottom:7px; }
+    input[type=file],input[type=password],textarea,select { width:100%; padding:11px 12px; border:1px solid #aebbb9; background:#fff; color:var(--ink); border-radius:2px; font:inherit; }
+    textarea { resize:vertical; min-height:88px; }
+    .hint { color:var(--muted); font-size:13px; font-weight:400; margin-top:7px; }
+    .check { display:flex; gap:10px; align-items:flex-start; margin:20px 0; font-weight:400; }
+    .check input { margin-top:5px; }
+    button,.download { display:inline-block; border:0; background:var(--ink); color:#fff; padding:11px 18px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; text-decoration:none; }
+    button:hover,.download:hover { background:var(--teal); }
+    button:disabled { opacity:.48; cursor:not-allowed; }
+    .status { min-height:26px; color:var(--muted); margin-top:16px; }
+    .status.error { color:#a83226; }
+    .status.success { color:var(--teal); }
+    .progress { color:var(--teal); font-weight:700; }
+    .segment { border-top:1px solid var(--line); padding:22px 0; display:grid; grid-template-columns:110px 1fr; gap:18px; }
+    .segment:first-child { border-top:0; }
+    .timestamp { color:var(--accent); font-size:13px; font-weight:800; }
+    .original { font-size:15px; margin-bottom:12px; }
+    .draft { padding:12px 14px; background:#f1f2ed; margin-bottom:15px; color:#334b4e; }
+    .segment textarea { min-height:70px; }
+    .segment .check { margin:12px 0 0; }
+    .actions { display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
+    .flags { display:flex; gap:7px; flex-wrap:wrap; margin-bottom:12px; }
+    .flag { background:#fff0da; color:#714710; border:1px solid #e4c794; padding:2px 8px; font-size:13px; font-weight:700; }
+    .review-tools { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:12px 0 18px; }
+    .review-tools select { width:auto; }
+    .secondary { background:#fff; border:1px solid var(--ink); color:var(--ink); }
+    audio { width:min(100%,580px); margin-top:20px; }
+    [hidden] { display:none !important; }
+    @media(max-width:700px) { .grid,.segment { grid-template-columns:1fr; } .segment { gap:6px; } .panel { padding:20px; } }
+  </style>
+</head>
+<body>
+  <header><div class="wrap"><a class="brand" href="index.html">PODCAST LOCALIZER <span style="color:var(--accent)">/ NEWSROOM MVP</span></a><a href="index.html">Project overview</a></div></header>
+  <main class="wrap">
+    <div class="intro"><p class="hint" style="letter-spacing:.12em;font-weight:800;color:var(--accent)">EDITORIAL WORKSPACE</p><h1>Review before you dub.</h1><p>Translate a short English clip into a Chinese voiceover. Check the source and draft side by side, fix risky lines, and approve every segment before generating audio.</p></div>
+    <section class="panel" aria-labelledby="upload-heading">
+      <h2 id="upload-heading">1. Prepare a clip</h2>
+      <form id="upload-form">
+        <p><button id="classroom-button" class="secondary" type="button">Explore classroom demo</button> <span class="hint">Fictional sample · no API key or access code</span></p>
+        <p class="hint">The published GitHub Pages version runs this classroom demo. Processing your own audio requires the separately hosted Python service.</p>
+        <details><summary>Use your own audio or the local development sample</summary>
+        <div class="grid"><div><label for="access-code">Access code</label><input id="access-code" type="password" autocomplete="off"><div class="hint">Provided by the project owner. It is not stored in your browser.</div></div><div><label for="audio-file">English audio</label><input id="audio-file" type="file" accept="audio/*,.mp3,.m4a,.wav,.ogg,.webm"><div class="hint">Up to 4 MB; use a clip of about one minute.</div></div></div>
+        <p style="margin-top:16px"><button id="sample-button" class="secondary" type="button">Open local development sample</button></p>
+        <label for="context" style="margin-top:18px">Editorial context (optional)</label><textarea id="context" maxlength="1000" placeholder="Speaker, topic, and names to check. Avoid sensitive material unless cleared for third-party processing."></textarea>
+        <details><summary>Glossary for this clip</summary><p class="hint">One term per line: English term = required Chinese wording.</p><textarea id="glossary" placeholder="English term = approved Chinese wording"></textarea></details>
+        <label class="check"><input id="authorized" type="checkbox"><span>I have permission to process this audio and understand that configured speech and translation providers will receive it.</span></label>
+        <button id="prepare-button" type="submit">Transcribe and translate</button></details><p id="prepare-status" class="status" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+    <section class="panel" id="review-panel" aria-labelledby="review-heading" hidden>
+      <h2 id="review-heading">2. Editor review</h2><p>Compare each line with the source, revise the Chinese script, and approve the final wording. Flagged lines appear first.</p>
+      <audio id="source-player" controls hidden></audio><button id="speak-source" class="secondary" type="button" hidden>Play sample narration</button><p id="approval-progress" class="progress"></p><div class="review-tools"><label for="review-filter">Show</label><select id="review-filter"><option value="all">All segments</option><option value="flagged">Priority review</option><option value="pending">Not approved</option></select><button id="save-review" class="secondary" type="button">Save review</button><button id="export-audit" class="secondary" type="button">Export audit CSV</button></div><p id="review-status" class="status" role="status"></p><div id="segments"></div>
+    </section>
+    <section class="panel" id="synthesis-panel" aria-labelledby="synthesis-heading" hidden>
+      <h2 id="synthesis-heading">3. Generate the dub</h2><p id="synthesis-explainer">Voice synthesis stays locked until every line is approved. The generated file opens with an AI voice disclosure.</p>
+      <div id="voice-settings" class="grid"><div><label for="backend">Voice service</label><select id="backend"><option value="minimax">MiniMax Mandarin voice</option><option value="openai">OpenAI general voice</option><option value="elevenlabs">ElevenLabs preset voice</option></select></div><div><label for="voice">Voice ID (optional)</label><input id="voice" type="text" autocomplete="off" placeholder="Leave blank for the default voice"><div class="hint">For MiniMax or OpenAI only. Never enter an API key here.</div></div></div>
+      <label class="check"><input id="disclosure" type="checkbox"><span>I will disclose to listeners that the Chinese voice is AI-generated.</span></label>
+      <div class="actions" style="margin-top:20px"><button id="synthesize-button" type="button" disabled>Approve and generate dub</button><a id="download-link" class="download" hidden download="chinese_audio.mp3">Download MP3</a></div>
+      <p id="synthesis-status" class="status" role="status" aria-live="polite"></p><audio id="output-player" controls hidden></audio>
+    </section>
+  </main>
+  <footer class="wrap" style="padding:18px 24px 36px;color:var(--muted)"><a href="https://github.com/assheisvivi/podcast-localizer">GitHub source</a> · <a href="policies.html#terms">Terms</a> · <a href="policies.html#privacy">Privacy</a> · <a href="policies.html#ai">AI policy</a></footer>
+  <script>
+    const $ = id => document.getElementById(id);
+    let rows = [];
+    let sessionId = null;
+    let classroomMode = false;
+    let sourceUrl = null;
+    let outputUrl = null;
+    const setStatus = (id, message, type='') => { const el=$(id); el.textContent=message; el.className='status '+type; };
+    function updateProgress() {
+      const approved = rows.filter(r => r.review_status === 'approved' && r.editor_translation_zh.trim()).length;
+      $('approval-progress').textContent = `${approved} of ${rows.length} segments approved`;
+      $('synthesize-button').disabled = !rows.length || approved !== rows.length || !$('disclosure').checked;
+      if(approved !== rows.length && outputUrl){URL.revokeObjectURL(outputUrl);outputUrl=null;$('output-player').hidden=true;$('download-link').hidden=true;}
+    }
+    function renderRows() {
+      const container = $('segments'); container.replaceChildren();
+      rows.map((row,index)=>({row,index})).sort((a,b)=>(b.row.qa_flags?.length||0)-(a.row.qa_flags?.length||0)).forEach(({row,index}) => {
+        const section=document.createElement('section'); section.className='segment';
+        section.dataset.flags=(row.qa_flags||[]).length ? 'flagged' : 'clear'; section.dataset.status=row.review_status;
+        const time=document.createElement('div'); time.className='timestamp'; time.textContent=`${row.start_sec}–${row.end_sec} sec`;
+        const content=document.createElement('div');
+        const english=document.createElement('p'); english.className='original'; english.textContent=row.english_transcript;
+        const flags=document.createElement('div'); flags.className='flags'; const flagNames={'数字待核':'Check numbers','术语待核':'Check glossary','事实待核':'Fact check','引语待核':'Check quote'};(row.qa_flags||[]).forEach(flag=>{const badge=document.createElement('span');badge.className='flag';badge.textContent=flagNames[flag]||flag;flags.append(badge);});
+        const englishLabel=document.createElement('label'); const englishEdit=document.createElement('textarea'); englishEdit.id=`english-${index}`; englishEdit.placeholder='Correct the source transcript if needed'; englishEdit.value=row.editor_english_transcript || '';
+        englishLabel.htmlFor=englishEdit.id; englishLabel.textContent='Source transcript correction (optional)';
+        englishEdit.addEventListener('input',()=>{row.editor_english_transcript=englishEdit.value; if(row.review_status==='approved'){row.review_status='needs_review';section.dataset.status=row.review_status;approve.checked=false;updateProgress();}});
+        const draft=document.createElement('p'); draft.className='draft'; draft.textContent=`AI draft: ${row.ai_translation_zh}`;
+        const finalLabel=document.createElement('label'); const final=document.createElement('textarea'); final.id=`final-${index}`; final.placeholder='Final Chinese script'; final.value=row.editor_translation_zh || row.ai_translation_zh;
+        finalLabel.htmlFor=final.id; finalLabel.textContent='Final Chinese script';
+        final.addEventListener('input',()=>{ row.editor_translation_zh=final.value; if(row.review_status==='approved') row.review_status='needs_review';section.dataset.status=row.review_status; approve.checked=false; updateProgress(); });
+        const noteLabel=document.createElement('label'); const note=document.createElement('textarea'); note.id=`note-${index}`; note.placeholder='Fact-check or reason for the edit'; note.value=row.editor_notes || ''; noteLabel.htmlFor=note.id; noteLabel.textContent='Editor note (optional)'; note.addEventListener('input',()=>{row.editor_notes=note.value;});
+        const errorLabel=document.createElement('label'); errorLabel.textContent='Error type'; const error=document.createElement('select'); error.innerHTML='<option value="">None / unclassified</option><option value="Tone">Tone</option><option value="Word choice">Word choice</option><option value="Industry term">Industry term</option><option value="Factual/Number">Fact or number</option>';error.value=row.error_type||'';error.addEventListener('change',()=>{row.error_type=error.value;});
+        const approveLabel=document.createElement('label'); approveLabel.className='check'; const approve=document.createElement('input'); approve.type='checkbox'; approve.checked=row.review_status==='approved';
+        approve.addEventListener('change',()=>{ row.editor_translation_zh=final.value.trim(); if(approve.checked && !row.editor_translation_zh){approve.checked=false; final.focus(); return;} row.review_status=approve.checked?'approved':'needs_review'; section.dataset.status=row.review_status; updateProgress(); });
+        const approveText=document.createElement('span'); approveText.textContent='I checked and approve this segment'; approveLabel.append(approve,approveText);
+        content.append(flags,english,englishLabel,englishEdit,draft,finalLabel,final,errorLabel,error,noteLabel,note,approveLabel); section.append(time,content); container.append(section);
+      }); updateProgress(); applyFilter();
+    }
+    function applyFilter(){const filter=$('review-filter').value;document.querySelectorAll('.segment').forEach(el=>{el.hidden=filter==='flagged'&&el.dataset.flags!=='flagged'||filter==='pending'&&el.dataset.status==='approved';});}
+    $('review-filter').addEventListener('change',applyFilter);
+    $('disclosure').addEventListener('change',updateProgress);
+    function glossaryTerms(){return $('glossary').value.split('\n').map(line=>line.split('=')).filter(parts=>parts.length>=2&&parts[0].trim()&&parts[1].trim()).map(parts=>({english:parts[0].trim(),preferred_chinese:parts.slice(1).join('=').trim(),notes:''}));}
+    function showSession(data){sessionId=data.session_id;rows=data.rows;if(outputUrl){URL.revokeObjectURL(outputUrl);outputUrl=null;}$('output-player').hidden=true;$('download-link').hidden=true;$('source-player').hidden=classroomMode;$('speak-source').hidden=!classroomMode;$('voice-settings').hidden=classroomMode;$('synthesis-explainer').textContent=classroomMode?'The classroom preview uses your browser voice. It does not create an MP3 or call a speech provider.':'Voice synthesis stays locked until every line is approved. The generated file opens with an AI voice disclosure.';$('synthesize-button').textContent=classroomMode?'Preview approved dub':'Approve and generate dub';renderRows();$('review-panel').hidden=false;$('synthesis-panel').hidden=false;$('review-panel').scrollIntoView({behavior:'smooth'});}
+    async function saveReview(){if(classroomMode){setStatus('review-status','Review saved in this browser session. Export a CSV to keep a copy.','success');return;}const response=await fetch('/api/review',{method:'POST',headers:{'Content-Type':'application/json','X-Demo-Access-Code':$('access-code').value},body:JSON.stringify({session_id:sessionId,rows})});const data=await response.json();if(!response.ok)throw new Error(data.detail||'Save failed');setStatus('review-status',`Saved: ${data.approved} of ${data.total} segments approved.`,'success');}
+    $('save-review').addEventListener('click',async()=>{try{await saveReview();}catch(error){setStatus('review-status',error.message,'error');}});
+    $('export-audit').addEventListener('click',async()=>{try{await saveReview();let blob;if(classroomMode){const fields=['segment_id','start_sec','english_transcript','editor_english_transcript','ai_translation_zh','editor_translation_zh','qa_flags','error_type','review_status','editor_notes'];const csv=[fields.join(','),...rows.map(row=>fields.map(key=>`"${String(key==='qa_flags'?row.qa_flags.join(';'):row[key]||'').replaceAll('"','""')}"`).join(','))].join('\r\n');blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});}else{const response=await fetch(`/api/audit/${sessionId}`,{headers:{'X-Demo-Access-Code':$('access-code').value}});if(!response.ok)throw new Error('Export failed');blob=await response.blob();}const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='human_edit_log.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(error){setStatus('review-status',error.message,'error');}});
+    const demoLines=[
+      {en:'The city opened three temporary shelters on Monday.',zh:'市政府周一开放了三处临时安置点。',flags:[]},
+      {en:'Officials say 120 people have registered so far.',zh:'官员表示，目前已有102人登记。',flags:['Check numbers']},
+      {en:'The shelters will remain open through Friday.',zh:'这些安置点将开放至周五。',flags:[]},
+      {en:'The mayor called the response a "just in time" effort.',zh:'市长称这是一项及时行动。',flags:['Check glossary','Check quote']}
+    ];
+    $('classroom-button').addEventListener('click',()=>{classroomMode=true;const sampleRows=demoLines.map((line,index)=>({segment_id:String(index),start_sec:(index*4).toFixed(3),end_sec:((index+1)*4).toFixed(3),duration_sec:'4.000',english_transcript:line.en,editor_english_transcript:'',ai_translation_zh:line.zh,editor_translation_zh:'',review_status:'needs_review',editor_notes:'',error_type:'',qa_flags:line.flags}));showSession({session_id:'classroom-demo',rows:sampleRows});setStatus('prepare-status','Classroom demo loaded. This fictional sample does not call an AI service.','success');});
+    function speak(text,language){if(!('speechSynthesis' in window)){setStatus('synthesis-status','Speech preview is unavailable in this browser.','error');return;}speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(text);utterance.lang=language;utterance.rate=.9;speechSynthesis.speak(utterance);}
+    $('speak-source').addEventListener('click',()=>speak(demoLines.map(line=>line.en).join(' '),'en-US'));
+    $('sample-button').addEventListener('click',async()=>{if(!$('access-code').value){$('access-code').focus();return;}setStatus('prepare-status','Opening the local sample…');try{const headers={'X-Demo-Access-Code':$('access-code').value};const response=await fetch('/api/sample',{headers});const data=await response.json();if(!response.ok)throw new Error(data.detail||'Sample unavailable');const audio=await fetch('/api/sample-audio',{headers});if(!audio.ok)throw new Error('Sample audio unavailable');if(sourceUrl)URL.revokeObjectURL(sourceUrl);sourceUrl=URL.createObjectURL(await audio.blob());$('source-player').src=sourceUrl;classroomMode=false;showSession(data);setStatus('prepare-status',`Opened ${rows.length} segments from the local development sample.`,'success');}catch(error){setStatus('prepare-status',error.message,'error');}});
+    $('access-code').addEventListener('change',async()=>{try{const response=await fetch('/api/glossary',{headers:{'X-Demo-Access-Code':$('access-code').value}});if(!response.ok)return;const data=await response.json();$('glossary').value=data.terms.map(x=>`${x.english} = ${x.preferred_chinese}`).join('\n');}catch{}});
+    $('upload-form').addEventListener('submit', async event => {
+      event.preventDefault(); const file=$('audio-file').files[0]; if(!file){setStatus('prepare-status','Choose an audio file first.','error');return;}if(!$('access-code').value){setStatus('prepare-status','Enter an access code first.','error');return;}if(!$('authorized').checked){setStatus('prepare-status','Confirm that you have permission to process this audio.','error');return;}
+      if(file.size>4000000){setStatus('prepare-status','The file exceeds 4 MB. Please trim it first.','error');return;}
+      $('prepare-button').disabled=true; setStatus('prepare-status','Transcribing and translating. Keep this page open…');
+      const body=new FormData(); body.append('audio',file); body.append('context',$('context').value); body.append('authorized',$('authorized').checked?'true':'false');body.append('glossary_json',JSON.stringify(glossaryTerms()));
+      try {
+        const response=await fetch('/api/prepare',{method:'POST',headers:{'X-Demo-Access-Code':$('access-code').value},body}); const data=await response.json();
+        if(!response.ok) throw new Error(data.detail||'Processing failed');
+        if(sourceUrl) URL.revokeObjectURL(sourceUrl); sourceUrl=URL.createObjectURL(file); $('source-player').src=sourceUrl;classroomMode=false;showSession(data);
+        setStatus('prepare-status',`Prepared ${rows.length} segments for review.`,'success');
+      } catch(error){setStatus('prepare-status',error.message||'Processing failed','error');}
+      finally {$('prepare-button').disabled=false;}
+    });
+    $('synthesize-button').addEventListener('click', async () => {
+      $('synthesize-button').disabled=true; setStatus('synthesis-status',classroomMode?'Playing a browser voice preview. No MP3 is generated in demo mode.':'Generating the Chinese dub…');
+      try {
+        await saveReview();
+        if(classroomMode){speak(rows.map(row=>row.editor_translation_zh).join(' '),'zh-CN');return;}
+        const response=await fetch('/api/synthesize',{method:'POST',headers:{'Content-Type':'application/json','X-Demo-Access-Code':$('access-code').value},body:JSON.stringify({session_id:sessionId,backend:$('backend').value,voice:$('voice').value,disclosure_confirmed:$('disclosure').checked})});
+        if(!response.ok){const data=await response.json();throw new Error(data.detail||'Synthesis failed');}
+        if(outputUrl) URL.revokeObjectURL(outputUrl); outputUrl=URL.createObjectURL(await response.blob());
+        $('output-player').src=outputUrl; $('output-player').hidden=false; $('download-link').href=outputUrl; $('download-link').hidden=false;
+        setStatus('synthesis-status','Dub generated. Listen and download the MP3.','success');
+      } catch(error){setStatus('synthesis-status',error.message||'Synthesis failed','error');}
+      finally {updateProgress();}
+    });
+    fetch('/api/health').then(r=>r.json()).then(data=>{if(!data.processing_enabled)setStatus('prepare-status','The API is not configured. The classroom demo is ready to use.');}).catch(()=>setStatus('prepare-status','Classroom demo is ready. Live processing requires the Python API.'));
+  </script>
+</body>
+</html>
