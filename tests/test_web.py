@@ -120,6 +120,16 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual(caught.exception.status_code, 413)
         transcribe.assert_not_called()
 
+    def test_prepare_identifies_transcription_stage_without_leaking_provider_detail(self):
+        audio = UploadFile(file=io.BytesIO(b"a" * 2000), filename="clip.mp3")
+        with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret", "AI_PROVIDER": "groq", "GROQ_API_KEY": "gsk-test"}), \
+             patch.object(web.pipeline, "transcribe", side_effect=web.pipeline.PipelineError("API 请求失败（HTTP 403）：private provider detail")):
+            with self.assertRaises(HTTPException) as caught:
+                asyncio.run(web.prepare(audio=audio, context="", glossary_json="[]", authorized=True, x_demo_access_code="secret"))
+        self.assertEqual(caught.exception.status_code, 403)
+        self.assertIn("Transcription failed", caught.exception.detail)
+        self.assertNotIn("private provider detail", caught.exception.detail)
+
     def test_synthesis_requires_explicit_final_approval(self):
         session = web.create_session([review_row().model_dump()], [])
         with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret"}):
