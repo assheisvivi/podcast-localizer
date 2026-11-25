@@ -29,6 +29,7 @@ from urllib.request import Request, urlopen
 API_BASE = "https://api.openai.com/v1"
 OPENROUTER_API_BASE = "https://openrouter.ai/api/v1"
 GROQ_API_BASE = "https://api.groq.com/openai/v1"
+APP_USER_AGENT = "PodcastLocalizer/1.0 (+https://github.com/assheisvivi/podcast-localizer)"
 MINIMAX_TTS_URL = "https://api.minimax.io/v1/t2a_v2"
 ELEVENLABS_TTS_URL = "https://api.elevenlabs.io/v1/text-to-speech"
 REVIEW_FIELDS = [
@@ -155,6 +156,9 @@ def api_request_multipart(
 
 
 def _open(request: Request) -> bytes:
+    # urllib's default Python-urllib signature can be rejected by upstream
+    # browser-integrity checks before the request reaches the API.
+    request.add_header("User-Agent", APP_USER_AGENT)
     try:
         with urlopen(request, timeout=300) as response:
             return response.read()
