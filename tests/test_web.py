@@ -59,6 +59,26 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual(transcribe.call_args.args[3], web.pipeline.OPENROUTER_API_BASE)
         self.assertEqual(translate.call_args.args[1], "qwen/qwen3.8-2.4t-a95b")
 
+    def test_prepare_prefers_groq_over_openrouter_when_both_keys_exist(self):
+        audio = UploadFile(file=io.BytesIO(b"a" * 2000), filename="clip.mp3")
+        transcript = {"segments": [{"id": 0, "start": 0, "end": 3, "text": "Hello."}]}
+        translation = {"segments": [{"segment_id": 0, "translation_zh": "你好。", "fact_flags": []}]}
+        with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret", "GROQ_API_KEY": "gsk-test", "OPENROUTER_API_KEY": "sk-or-test"}), \
+             patch.object(web.pipeline, "transcribe", return_value=transcript) as transcribe, \
+             patch.object(web.pipeline, "translate_segments_groq", return_value=translation) as translate:
+            result = asyncio.run(web.prepare(audio=audio, context="", glossary_json="[]", authorized=True, x_demo_access_code="secret"))
+            health = web.health()
+        self.assertEqual(result["segment_count"], 1)
+        self.assertEqual(health["ai_provider"], "groq")
+        self.assertEqual(transcribe.call_args.args[1], "whisper-large-v3")
+        self.assertEqual(transcribe.call_args.args[3], web.pipeline.GROQ_API_BASE)
+        self.assertEqual(translate.call_args.args[1], "qwen/qwen3.8-27b")
+
+    def test_explicit_groq_selection_does_not_fall_back_to_openrouter(self):
+        with patch.dict(os.environ, {"AI_PROVIDER": "groq", "GROQ_API_KEY": "", "OPENROUTER_API_KEY": "sk-or-test", "DEMO_ACCESS_CODE": "secret"}):
+            self.assertFalse(web.health()["processing_enabled"])
+            self.assertEqual(web.ai_provider(), "groq")
+
     def test_openrouter_model_overrides(self):
         audio = UploadFile(file=io.BytesIO(b"a" * 2000), filename="clip.mp3")
         transcript = {"segments": [{"id": 0, "start": 0, "end": 3, "text": "Hello."}]}

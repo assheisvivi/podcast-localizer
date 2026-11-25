@@ -74,6 +74,18 @@ class PipelineTests(unittest.TestCase):
             with self.assertRaises(pipeline.PipelineError):
                 pipeline.translate_segments_openrouter(segments, "openai/gpt-6.2-sol", [], "key")
 
+    def test_groq_translation_uses_strict_schema_without_openrouter_routing(self):
+        segments = [{"segment_id": 3, "start": 0, "end": 2, "text": "Hello."}]
+        answer = {"choices": [{"message": {"content": json.dumps({"segments": [
+            {"segment_id": 3, "translation_zh": "你好。", "fact_flags": []}
+        ]})}}]}
+        with patch.object(pipeline, "post_json", return_value=json.dumps(answer).encode()) as request:
+            result = pipeline.translate_segments_groq(segments, "qwen/qwen3.8-27b", [], "key")
+        self.assertEqual(result["segments"][0]["translation_zh"], "你好。")
+        self.assertEqual(request.call_args.args[0], pipeline.GROQ_API_BASE + "/chat/completions")
+        self.assertNotIn("provider", request.call_args.args[1])
+        self.assertTrue(request.call_args.args[1]["response_format"]["json_schema"]["strict"])
+
     def test_build_review_rows_starts_unapproved(self):
         rows = pipeline.build_review_rows(
             [{"segment_id": 3, "start": 2, "end": 4, "text": "Example."}],
