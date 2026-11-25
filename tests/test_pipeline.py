@@ -83,6 +83,13 @@ class PipelineTests(unittest.TestCase):
             pipeline.transcribe(Path("clip.mp3"), "whisper-1", "sk-test")
         self.assertIn(("timestamp_granularities[]", "word"), request.call_args.args[1])
 
+    def test_api_request_identifies_app_to_upstream(self):
+        request = pipeline.Request("https://api.groq.com/openai/v1/models")
+        with patch.object(pipeline, "urlopen") as opened:
+            opened.return_value.__enter__.return_value.read.return_value = b"{}"
+            pipeline._open(request)
+        self.assertEqual(request.get_header("User-agent"), pipeline.APP_USER_AGENT)
+
     def test_openrouter_translation_keeps_segment_ids_and_strict_schema(self):
         segments = [{"segment_id": 3, "start": 0, "end": 2, "text": "Hello."}]
         answer = {"choices": [{"message": {"content": json.dumps({"segments": [
