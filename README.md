@@ -14,17 +14,19 @@ The existing local recording under `input/` is excluded from GitHub. It is for d
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 export DEMO_ACCESS_CODE='choose-a-long-random-access-code'
-# One OpenRouter key can handle transcription, translation, and voice:
-export OPENROUTER_API_KEY='your-key'
-# Alternatively, configure OPENAI_API_KEY for transcription/translation
-# and a matching TTS provider key.
+# Recommended: Groq handles transcription and translation.
+export AI_PROVIDER='groq'
+export GROQ_API_KEY='your-groq-key'
+# Add one voice key for downloadable Chinese MP3 output.
+export MINIMAX_API_KEY='your-minimax-key'
+# Alternatively, use ELEVENLABS_API_KEY plus ELEVENLABS_VOICE_ID.
 # Optional: set daily paid-call caps (defaults: 20 preparations, 10 dubs)
 export MAX_PREPARES_PER_DAY=20
 export MAX_SYNTHESIS_PER_DAY=10
 .venv/bin/uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
-Open `http://127.0.0.1:8000/app.html`. Use **Open local development sample** with the access code to review the existing clip without new transcription costs. With `OPENROUTER_API_KEY`, new uploads default to Mistral Voxtral Small Transcribe 3 and Qwen3.8 2.4T A95B translation; the default OpenRouter voice is MiniMax Speech 2.8 HD. These defaults avoid the OpenAI model restriction some accounts have. Set `OPENROUTER_TRANSCRIPTION_MODEL`, `OPENROUTER_TRANSLATION_MODEL`, `OPENROUTER_TTS_MODEL`, and `OPENROUTER_TTS_VOICE` on the server to choose supported alternatives after auditioning the same reviewed script. Alternatively, use `OPENAI_API_KEY` and a separate TTS provider. API keys stay on the server.
+Open `http://127.0.0.1:8000/app.html`. Use **Open local development sample** with the access code to review the existing clip without new transcription costs. With `AI_PROVIDER=groq` and `GROQ_API_KEY`, new uploads use Whisper Large v3 for timestamped transcription and Qwen 3.8 27B for structured Chinese translation. `GROQ_TRANSCRIPTION_MODEL` and `GROQ_TRANSLATION_MODEL` override those defaults. Groq's free tier is rate limited and access depends on your account. For downloadable Chinese audio, use `MINIMAX_API_KEY` (HD voice by default) or `ELEVENLABS_API_KEY` plus `ELEVENLABS_VOICE_ID`; audition the same approved script before choosing. OpenRouter and OpenAI remain optional legacy providers. API keys stay on the server.
 
 ## Architecture and limits
 
@@ -39,7 +41,7 @@ The live prototype handles short, single-speaker clips. A shared access code pro
 
 ## Hosted pilot
 
-`render.yaml` describes a **Free** Render Python web service. Create a Free Neon PostgreSQL project and enter its connection string as Render's secret `DATABASE_URL`; also set a long random `DEMO_ACCESS_CODE`. The deployment refuses to start without the persistent database, so review records and daily caps survive Render's free-service sleep and restarts. Add `OPENROUTER_API_KEY` in Render's Environment page to configure transcription, translation, and the default voice with one key. All three provider calls require available OpenRouter credit; a key or free account alone does not fund them. Some accounts are restricted from using OpenAI models, so the defaults use other providers. Alternatively, add `OPENAI_API_KEY` and optional TTS provider keys. Without usable AI credit the classroom demo still works, but real processing cannot complete. Free hosting has quotas and cold starts. Never commit database URLs, access codes, or API keys to GitHub.
+`render.yaml` describes a **Free** Render Python web service. Create a Free Neon PostgreSQL project and enter its connection string as Render's secret `DATABASE_URL`; also set a long random `DEMO_ACCESS_CODE`. The deployment refuses to start without the persistent database, so review records and daily caps survive Render's free-service sleep and restarts. Set `AI_PROVIDER=groq`, then add `GROQ_API_KEY` in Render's Environment page. This explicit provider choice prevents a fallback to an old OpenRouter key when Groq is not configured. Add `MINIMAX_API_KEY` for the recommended Mandarin MP3 voice, or `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` to try its free tier. A working provider key and available quota are required for live processing. Free hosting has quotas and cold starts. Never commit database URLs, access codes, or API keys to GitHub.
 
 ## GitHub Pages
 

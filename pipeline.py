@@ -28,6 +28,7 @@ from urllib.request import Request, urlopen
 
 API_BASE = "https://api.openai.com/v1"
 OPENROUTER_API_BASE = "https://openrouter.ai/api/v1"
+GROQ_API_BASE = "https://api.groq.com/openai/v1"
 MINIMAX_TTS_URL = "https://api.minimax.io/v1/t2a_v2"
 ELEVENLABS_TTS_URL = "https://api.elevenlabs.io/v1/text-to-speech"
 REVIEW_FIELDS = [
@@ -311,6 +312,28 @@ def translate_segments_openrouter(
     api_key: str,
     context: str = "",
 ) -> dict[str, Any]:
+    return _translate_segments_chat(segments, model, glossary, api_key, context, OPENROUTER_API_BASE, True)
+
+
+def translate_segments_groq(
+    segments: list[dict[str, Any]],
+    model: str,
+    glossary: list[dict[str, str]],
+    api_key: str,
+    context: str = "",
+) -> dict[str, Any]:
+    return _translate_segments_chat(segments, model, glossary, api_key, context, GROQ_API_BASE, False)
+
+
+def _translate_segments_chat(
+    segments: list[dict[str, Any]],
+    model: str,
+    glossary: list[dict[str, str]],
+    api_key: str,
+    context: str,
+    api_base: str,
+    openrouter: bool,
+) -> dict[str, Any]:
     schema = {
         "type": "object",
         "properties": {"segments": {"type": "array", "items": {
@@ -343,11 +366,12 @@ def translate_segments_openrouter(
             "type": "json_schema",
             "json_schema": {"name": "journalism_translation", "strict": True, "schema": schema},
         },
-        "provider": {"require_parameters": True},
     }
+    if openrouter:
+        payload["provider"] = {"require_parameters": True}
     try:
         response = json.loads(post_json(
-            OPENROUTER_API_BASE + "/chat/completions", payload,
+            api_base + "/chat/completions", payload,
             {"Authorization": f"Bearer {api_key}"},
         ).decode("utf-8"))
         message = response["choices"][0]["message"]
@@ -361,7 +385,7 @@ def translate_segments_openrouter(
             raise ValueError("字段格式不正确")
         return result
     except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as exc:
-        raise PipelineError("OpenRouter 翻译结果格式不正确，未进入人工审校。") from exc
+        raise PipelineError("翻译结果格式不正确，未进入人工审校。") from exc
 
 
 def extract_output_text(response: dict[str, Any]) -> str:

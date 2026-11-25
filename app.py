@@ -140,13 +140,32 @@ def public_error(exc: pipeline.PipelineError) -> HTTPException:
     return HTTPException(502, "The upstream service failed. Please try again later.")
 
 
+def ai_provider() -> str:
+    selected = os.environ.get("AI_PROVIDER", "").strip().lower()
+    if selected:
+        return selected if selected in {"groq", "openrouter", "openai"} else "invalid"
+    if os.environ.get("GROQ_API_KEY"):
+        return "groq"
+    if os.environ.get("OPENROUTER_API_KEY"):
+        return "openrouter"
+    if os.environ.get("OPENAI_API_KEY", "").startswith("sk-"):
+        return "openai"
+    return ""
+
+
 @app.get("/api/health")
 def health() -> dict[str, object]:
-    ai_key_available = bool(os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY", "").startswith("sk-"))
+    provider = ai_provider()
+    ai_key_available = bool(
+        (provider == "groq" and os.environ.get("GROQ_API_KEY"))
+        or (provider == "openrouter" and os.environ.get("OPENROUTER_API_KEY"))
+        or (provider == "openai" and os.environ.get("OPENAI_API_KEY", "").startswith("sk-"))
+    )
     return {
         "status": "ok",
         "review_storage": review_store.backend(),
         "processing_enabled": bool(os.environ.get("DEMO_ACCESS_CODE") and ai_key_available),
+        "ai_provider": provider if ai_key_available else "",
         "sample_available": SAMPLE_AUDIO.exists() and SAMPLE_REVIEW.exists(),
         "transcription_enabled": ai_key_available,
         "tts_backends": {
@@ -177,8 +196,15 @@ async def prepare(
     if len(glossary_json) > 20000:
         raise HTTPException(400, "Glossary is too long.")
     try:
-        use_openrouter = bool(os.environ.get("OPENROUTER_API_KEY"))
-        key = pipeline.require_env_key("OPENROUTER_API_KEY") if use_openrouter else pipeline.require_api_key()
+        provider = ai_provider()
+        if provider == "groq":
+            key = pipeline.require_env_key("GROQ_API_KEY")
+        elif provider == "openrouter":
+            key = pipeline.require_env_key("OPENROUTER_API_KEY")
+        elif provider == "openai":
+            key = pipeline.require_api_key()
+        else:
+            raise pipeline.PipelineError("未检测到可用的转写与翻译服务。")
     except pipeline.PipelineError as exc:
         raise public_error(exc) from exc
     try:
@@ -202,12 +228,20 @@ async def prepare(
         try:
             transcript = pipeline.transcribe(
                 audio_path,
-                os.environ.get("OPENROUTER_TRANSCRIPTION_MODEL", "mistralai/voxtral-small-transcribe-3-0") if use_openrouter else "whisper-1",
+                (os.environ.get("GROQ_TRANSCRIPTION_MODEL", "whisper-large-v3") if provider == "groq"
+                 else os.environ.get("OPENROUTER_TRANSCRIPTION_MODEL", "mistralai/voxtral-small-transcribe-3-0") if provider == "openrouter"
+                 else "whisper-1"),
                 key,
-                pipeline.OPENROUTER_API_BASE if use_openrouter else pipeline.API_BASE,
+                (pipeline.GROQ_API_BASE if provider == "groq"
+                 else pipeline.OPENROUTER_API_BASE if provider == "openrouter"
+                 else pipeline.API_BASE),
             )
             segments = pipeline.extract_segments(transcript)
-            if use_openrouter:
+            if provider == "groq":
+                translation = pipeline.translate_segments_groq(
+                    segments, os.environ.get("GROQ_TRANSLATION_MODEL", "qwen/qwen3.8-27b"), glossary, key, context
+                )
+            elif provider == "openrouter":
                 translation = pipeline.translate_segments_openrouter(
                     segments, os.environ.get("OPENROUTER_TRANSLATION_MODEL", "qwen/qwen3.8-2.4t-a95b"), glossary, key, context
                 )

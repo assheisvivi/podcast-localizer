@@ -16,19 +16,19 @@
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 export DEMO_ACCESS_CODE='自己设置的一串长随机试用码'
-# 选一种：OpenRouter 一把 Key 可用于转写、翻译和默认的 MiniMax 中文配音
-export OPENROUTER_API_KEY='有效的 OpenRouter API Key'
-# 或者使用 OpenAI 转写/翻译，并另配 MiniMax 或 ElevenLabs 配音
-# export OPENAI_API_KEY='有效的 OpenAI API Key'
-# export MINIMAX_API_KEY='有效的 MiniMax API Key'
+# 推荐：Groq 负责英文转写和中文初译，MiniMax 直接生成中文 MP3
+export AI_PROVIDER='groq'
+export GROQ_API_KEY='有效的 Groq API Key'
+export MINIMAX_API_KEY='有效的 MiniMax API Key'
+# 免费配音试跑可改用 ELEVENLABS_API_KEY 和 ELEVENLABS_VOICE_ID
 export MAX_PREPARES_PER_DAY=20
 export MAX_SYNTHESIS_PER_DAY=10
 .venv/bin/uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
-然后打开 `http://127.0.0.1:8000/app.html`，输入试用码并点击“打开本地演示样本”。只体验审校时不需要 AI 服务密钥。配置 `OPENROUTER_API_KEY` 后，真实上传默认用 Mistral Voxtral Small Transcribe 3 转写、Qwen3.8 2.4T A95B 初译，配音默认用 MiniMax Speech 2.8 HD。这组模型避开了部分账户的 OpenAI 模型访问限制。可在 Render 服务端用 `OPENROUTER_TRANSCRIPTION_MODEL`、`OPENROUTER_TRANSLATION_MODEL`、`OPENROUTER_TTS_MODEL` 和 `OPENROUTER_TTS_VOICE` 调整模型与声音；请用同一段审定稿试听后再决定。`DEMO_ACCESS_CODE` 是团队共用访问限制，不能代替正式的个人账号认证。API Key 只放在服务端环境变量，不要提交到 GitHub，也不要填进网页。
+然后打开 `http://127.0.0.1:8000/app.html`，输入试用码并点击“打开本地演示样本”。只体验审校时不需要 AI 服务密钥。配置 `AI_PROVIDER=groq` 与 `GROQ_API_KEY` 后，真实上传默认用 Whisper Large v3 生成带时间戳的英文转写，再由 Qwen3.8 27B 生成结构化中文初译。Groq 免费层有调用限制，能否使用以账户实际权限为准。可用 `GROQ_TRANSCRIPTION_MODEL` 和 `GROQ_TRANSLATION_MODEL` 调整模型。下载中文 MP3 需另配 `MINIMAX_API_KEY`，或 `ELEVENLABS_API_KEY` 加 `ELEVENLABS_VOICE_ID`；请用同一段审定稿试听后再决定。`DEMO_ACCESS_CODE` 是团队共用访问限制，不能代替正式的个人账号认证。API Key 只放在服务端环境变量，不要提交到 GitHub，也不要填进网页。
 
-受控试用版可使用仓库根目录的 `render.yaml` 部署到 **Render 免费 Web Service**。先在 Neon 创建免费 PostgreSQL 项目，再将其连接字符串作为 `DATABASE_URL` 填入 Render；同时填写自己设置的长随机 `DEMO_ACCESS_CODE`。没有数据库连接时服务会拒绝启动，避免免费实例休眠后丢失审校记录和每日额度。在 Render 的 Environment 页面添加 `OPENROUTER_API_KEY`，即可配置转写、翻译和配音；三项调用均需要可用的 OpenRouter 余额，单纯注册免费账号或创建 Key 不等于获得额度。也可改填 `OPENAI_API_KEY` 并选择相应配音服务。没有可用 AI 额度时仍可使用课堂演示，但真实上传无法完成处理。Render 免费服务闲置后会休眠，首次访问可能较慢；免费额度有限，AI 服务调用可能产生费用。不要把数据库连接字符串、试用码或 API Key 提交到 GitHub。网页通过同域 `/api/prepare` 与 `/api/synthesize` 调用后端。当前上传上限为 4 MB；录音会传给配置的第三方服务。采访敏感内容应先取得编辑部批准和受访者相关授权，再邀请他人试用。
+受控试用版可使用仓库根目录的 `render.yaml` 部署到 **Render 免费 Web Service**。先在 Neon 创建免费 PostgreSQL 项目，再将其连接字符串作为 `DATABASE_URL` 填入 Render；同时填写自己设置的长随机 `DEMO_ACCESS_CODE`。没有数据库连接时服务会拒绝启动，避免免费实例休眠后丢失审校记录和每日额度。在 Render 的 Environment 页面设置 `AI_PROVIDER=groq` 并添加 `GROQ_API_KEY`；这样即使旧的 OpenRouter Key 仍在，服务也不会回退到它。另填 `MINIMAX_API_KEY`，或 `ELEVENLABS_API_KEY` 与 `ELEVENLABS_VOICE_ID`，才能生成可下载的中文 MP3。没有可用 AI 额度时仍可使用课堂演示，但真实上传无法完成处理。Render 免费服务闲置后会休眠，首次访问可能较慢；免费额度有限，AI 服务调用可能产生费用。不要把数据库连接字符串、试用码或 API Key 提交到 GitHub。网页通过同域 `/api/prepare` 与 `/api/synthesize` 调用后端。当前上传上限为 4 MB；录音会传给配置的第三方服务。采访敏感内容应先取得编辑部批准和受访者相关授权，再邀请他人试用。
 
 ## 工作流
 

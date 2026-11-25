@@ -16,6 +16,12 @@ services:
         sync: false
       - key: DEMO_ACCESS_CODE
         sync: false
+      - key: AI_PROVIDER
+        value: groq
+      - key: GROQ_API_KEY
+        sync: false
+      - key: MINIMAX_API_KEY
+        sync: false
       - key: MAX_PREPARES_PER_DAY
         value: "20"
       - key: MAX_SYNTHESIS_PER_DAY
