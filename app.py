@@ -108,7 +108,7 @@ class ReviewRow(BaseModel):
 
 class SynthesizeRequest(BaseModel):
     session_id: str
-    backend: str = "minimax"
+    backend: str = "edge"
     voice: str = ""
     disclosure_confirmed: bool = False
 
@@ -169,6 +169,7 @@ def health() -> dict[str, object]:
         "sample_available": SAMPLE_AUDIO.exists() and SAMPLE_REVIEW.exists(),
         "transcription_enabled": ai_key_available,
         "tts_backends": {
+            "edge": True,
             "minimax": bool(os.environ.get("MINIMAX_API_KEY")),
             "openai": bool(os.environ.get("OPENAI_API_KEY", "").startswith("sk-")),
             "elevenlabs": bool(os.environ.get("ELEVENLABS_API_KEY") and os.environ.get("ELEVENLABS_VOICE_ID")),
@@ -347,10 +348,14 @@ def synthesize(
         raise HTTPException(400, "Complete and approve every Chinese segment first.")
     if sum(len(row["editor_translation_zh"]) for row in rows) > 5000:
         raise HTTPException(400, "Chinese script is too long; this prototype accepts up to 5,000 characters.")
-    if request.backend not in {"minimax", "openai", "elevenlabs", "openrouter"}:
+    if request.backend not in {"edge", "minimax", "openai", "elevenlabs", "openrouter"}:
         raise HTTPException(400, "Unsupported voice service.")
+    if request.backend == "edge" and request.voice and request.voice not in pipeline.EDGE_VOICES:
+        raise HTTPException(400, "Choose Yunxi or Xiaoxiao for the free Mandarin voice.")
     try:
-        if request.backend == "minimax":
+        if request.backend == "edge":
+            provider_key = ""
+        elif request.backend == "minimax":
             provider_key = pipeline.require_env_key("MINIMAX_API_KEY")
         elif request.backend == "openai":
             provider_key = pipeline.require_api_key()
@@ -368,7 +373,12 @@ def synthesize(
         output_path = Path(directory) / "chinese_audio.mp3"
         pipeline.write_review_csv(review_path, [{key: row.get(key, "") for key in pipeline.REVIEW_FIELDS} for row in rows])
         try:
-            if request.backend == "minimax":
+            if request.backend == "edge":
+                pipeline.synthesize_edge(
+                    review_path, output_path,
+                    request.voice or "zh-CN-YunxiNeural", False, True,
+                )
+            elif request.backend == "minimax":
                 pipeline.synthesize_minimax(
                     review_path, output_path, "speech-2.8-hd",
                     request.voice or "male-qn-qingse", 0.96, False, True,
@@ -393,6 +403,8 @@ def synthesize(
                     provider_key,
                 )
         except pipeline.PipelineError as exc:
+            if request.backend == "edge":
+                raise HTTPException(502, "Free Mandarin MP3 voice is unavailable. Use browser preview for now.") from exc
             raise public_error(exc) from exc
         audio = output_path.read_bytes()
     return Response(

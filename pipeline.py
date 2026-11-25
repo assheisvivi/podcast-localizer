@@ -587,6 +587,37 @@ def synthesize_openrouter(
     )
 
 
+EDGE_VOICES = {"zh-CN-YunxiNeural", "zh-CN-XiaoxiaoNeural"}
+
+
+def synthesize_edge(
+    review_path: Path,
+    output_path: Path,
+    voice: str = "zh-CN-YunxiNeural",
+    allow_unreviewed_demo: bool = False,
+    include_disclosure: bool = True,
+) -> None:
+    if voice not in EDGE_VOICES:
+        raise PipelineError("Unsupported Edge voice.")
+    script, pending = build_synthesis_script(
+        review_path, allow_unreviewed_demo, include_disclosure
+    )
+    try:
+        import edge_tts
+
+        with tempfile.TemporaryDirectory(prefix="journalism-ai-edge-") as directory:
+            temporary_audio = Path(directory) / "speech.mp3"
+            edge_tts.Communicate(script, voice).save_sync(str(temporary_audio))
+            audio = temporary_audio.read_bytes()
+    except Exception as exc:
+        raise PipelineError("Edge TTS unavailable.") from exc
+    save_synthesis(
+        output_path, script, audio, review_path, pending,
+        allow_unreviewed_demo, include_disclosure,
+        {"tts_backend": "edge", "voice": voice},
+    )
+
+
 def synthesize_minimax(
     review_path: Path,
     output_path: Path,
