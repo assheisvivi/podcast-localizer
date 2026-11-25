@@ -4,7 +4,7 @@ A human-gated English-to-Mandarin podcast localization prototype for news produc
 
 ## Classroom demo
 
-The static site in `docs/` is designed for GitHub Pages. Open `docs/index.html` locally or publish the repository with the included Pages workflow. Select **Explore classroom demo** in the review workspace. The fictional sample needs no access code, API key, or backend. You can inspect risk flags, edit the Chinese script, approve each line, hear a browser voice preview, and export an audit CSV. Browser speech is a preview only; it does not produce an MP3.
+The static site in `docs/` is designed for GitHub Pages. Open `docs/index.html` locally or publish the `main` branch's `/docs` folder with GitHub Pages. Select **Explore classroom demo** in the review workspace. The fictional sample needs no access code, API key, or backend. You can inspect risk flags, edit the Chinese script, approve each line, hear a browser voice preview, and export an audit CSV. Browser speech is a preview only; it does not produce an MP3.
 
 The existing local recording under `input/` is excluded from GitHub. It is for development, not a public classroom sample.
 
@@ -45,7 +45,7 @@ The live prototype handles short, single-speaker clips. A shared access code pro
 
 ## GitHub Pages
 
-The workflow at `.github/workflows/pages.yml` publishes `docs/` after pushes to `main`. In the GitHub repository, enable **Settings → Pages → Build and deployment → GitHub Actions**. Then push the source to `main`. GitHub Pages will serve the classroom demo; live API processing needs separate Python hosting.
+In the GitHub repository, set **Settings → Pages → Build and deployment → Deploy from a branch**, choose `main` and `/docs`, then save. GitHub Pages serves the classroom demo after pushes to `main`; live API processing runs on the separate Python service.
 
 ## Tests
 

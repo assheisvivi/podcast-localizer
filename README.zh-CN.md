@@ -2,7 +2,7 @@
 
 这是一个为国际新闻编辑设计的最小可行版本：英文音频经过转写和中文初译后，程序会强制暂停，等待记者逐段核对，再生成中文配音。
 
-项目介绍页位于 [`docs/index.html`](docs/index.html)，审校工作台位于 [`docs/app.html`](docs/app.html)。工作台需要运行根目录的 FastAPI 服务；仅用 GitHub Pages 发布 `docs/` 时，上传和合成接口不会运行。公开仓库不包含本地课程记录、研究资料、采访或演示音频，以及 `runs/` 中的审校与生成结果。下面的 `trump_victory_speech_65s.mp3` 路径是本地演示样本；从公开仓库克隆后，请换成自己有权使用的音频文件。
+项目介绍页位于 [`docs/index.html`](docs/index.html)，审校工作台位于 [`docs/app.html`](docs/app.html)。GitHub 仓库的 **Settings → Pages → Build and deployment** 已设为 **Deploy from a branch**，来源是 `main` 分支的 `/docs` 文件夹。工作台需要运行根目录的 FastAPI 服务；仅用 GitHub Pages 发布 `docs/` 时，上传和合成接口不会运行。公开仓库不包含本地课程记录、研究资料、采访或演示音频，以及 `runs/` 中的审校与生成结果。下面的 `trump_victory_speech_65s.mp3` 路径是本地演示样本；从公开仓库克隆后，请换成自己有权使用的音频文件。
 
 ## 网页工作台（邀请试用）
 
