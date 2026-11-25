@@ -77,7 +77,7 @@
     </section>
     <section class="panel" id="synthesis-panel" aria-labelledby="synthesis-heading" hidden>
       <h2 id="synthesis-heading">3. Generate the dub</h2><p id="synthesis-explainer">Voice synthesis stays locked until every line is approved. The generated file opens with an AI voice disclosure.</p>
-      <div id="voice-settings" class="grid"><div><label for="backend">Voice service</label><select id="backend"><option value="browser">Browser preview (no MP3)</option><option value="minimax">MiniMax Mandarin voice</option><option value="elevenlabs">ElevenLabs voice</option><option value="openrouter">OpenRouter voice</option><option value="openai">OpenAI general voice</option></select></div><div><label for="voice">Voice ID (optional)</label><input id="voice" type="text" autocomplete="off" placeholder="Leave blank for the default voice"><div class="hint">Use a voice supported by the selected service. Never enter an API key here.</div></div></div>
+      <div id="voice-settings" class="grid"><div><label for="backend">Voice service</label><select id="backend"><option value="edge">Free Mandarin MP3 (Edge)</option><option value="browser">Browser preview (no MP3)</option><option value="minimax">MiniMax Mandarin voice</option><option value="elevenlabs">ElevenLabs voice</option><option value="openrouter">OpenRouter voice</option><option value="openai">OpenAI general voice</option></select></div><div><label for="voice">Voice ID (optional)</label><input id="voice" type="text" autocomplete="off" placeholder="Leave blank for Yunxi"><div class="hint">Free Edge voices: zh-CN-YunxiNeural or zh-CN-XiaoxiaoNeural. Never enter an API key here.</div></div></div>
       <label class="check"><input id="disclosure" type="checkbox"><span>I will disclose to listeners that the Chinese voice is AI-generated.</span></label>
       <div class="actions" style="margin-top:20px"><button id="synthesize-button" type="button" disabled>Approve and generate dub</button><a id="download-link" class="download" hidden download="chinese_audio.mp3">Download MP3</a></div>
       <p id="synthesis-status" class="status" role="status" aria-live="polite"></p><audio id="output-player" controls hidden></audio>
@@ -162,19 +162,20 @@
       finally {$('prepare-button').disabled=false;}
     });
     $('synthesize-button').addEventListener('click', async () => {
+      if(outputUrl){URL.revokeObjectURL(outputUrl);outputUrl=null;}$('output-player').hidden=true;$('download-link').hidden=true;
       $('synthesize-button').disabled=true; setStatus('synthesis-status',classroomMode||$('backend').value==='browser'?'Playing a browser voice preview. No MP3 is generated.':'Generating the Chinese dub…');
       try {
         await saveReview();
         if(classroomMode||$('backend').value==='browser'){speak(rows.map(row=>row.editor_translation_zh).join(' '),'zh-CN');setStatus('synthesis-status','Browser voice preview started. No MP3 is generated.','success');return;}
         const response=await fetch('/api/synthesize',{method:'POST',headers:{'Content-Type':'application/json','X-Demo-Access-Code':$('access-code').value},body:JSON.stringify({session_id:sessionId,backend:$('backend').value,voice:$('voice').value,disclosure_confirmed:$('disclosure').checked})});
-        if(!response.ok){const data=await response.json();throw new Error(data.detail||'Synthesis failed');}
+        if(!response.ok){const data=await response.json();if($('backend').value==='edge'&&response.status===502&&data.detail==='Free Mandarin MP3 voice is unavailable. Use browser preview for now.'){speak(rows.map(row=>row.editor_translation_zh).join(' '),'zh-CN');setStatus('synthesis-status','Free MP3 voice is unavailable. Browser preview started; no MP3 was created.','error');return;}throw new Error(data.detail||'Synthesis failed');}
         if(outputUrl) URL.revokeObjectURL(outputUrl); outputUrl=URL.createObjectURL(await response.blob());
         $('output-player').src=outputUrl; $('output-player').hidden=false; $('download-link').href=outputUrl; $('download-link').hidden=false;
         setStatus('synthesis-status','Dub generated. Listen and download the MP3.','success');
       } catch(error){setStatus('synthesis-status',error.message||'Synthesis failed','error');}
       finally {updateProgress();}
     });
-    fetch('/api/health').then(r=>r.json()).then(data=>{setStatus('prepare-status',data.processing_enabled?`Live processing is configured with ${data.ai_provider}. Provider access and quota are checked when you submit.`:'The API is not configured. The classroom demo is ready to use.');if(!data.sample_available)$('sample-button').hidden=true;if(data.tts_backends?.minimax)$('backend').value='minimax';else if(data.tts_backends?.elevenlabs)$('backend').value='elevenlabs';else $('backend').value='browser';updateVoiceAction();}).catch(()=>setStatus('prepare-status','Classroom demo is ready. Live processing requires the Python API.'));
+    fetch('/api/health').then(r=>r.json()).then(data=>{setStatus('prepare-status',data.processing_enabled?`Live processing is configured with ${data.ai_provider}. Provider access and quota are checked when you submit.`:'The API is not configured. The classroom demo is ready to use.');if(!data.sample_available)$('sample-button').hidden=true;$('backend').value=data.tts_backends?.edge?'edge':'browser';updateVoiceAction();}).catch(()=>setStatus('prepare-status','Classroom demo is ready. Live processing requires the Python API.'));
   </script>
 </body>
 </html>
