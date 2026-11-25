@@ -136,7 +136,7 @@ class WebApiTests(unittest.TestCase):
              patch.object(web.pipeline, "synthesize_minimax", side_effect=fake_synthesis):
             web.review(web.ReviewRequest(session_id=session["session_id"], rows=[review_row(status="approved", final="你好。")]), "secret")
             response = web.synthesize(
-                web.SynthesizeRequest(session_id=session["session_id"], disclosure_confirmed=True), "secret"
+                web.SynthesizeRequest(session_id=session["session_id"], backend="minimax", disclosure_confirmed=True), "secret"
             )
         self.assertEqual(response.media_type, "audio/mpeg")
         self.assertTrue(response.body.startswith(b"ID3"))
@@ -154,6 +154,30 @@ class WebApiTests(unittest.TestCase):
             ), "secret")
         self.assertEqual(response.media_type, "audio/mpeg")
         self.assertEqual(voice.call_args.args[2:4], ("minimax/speech-2.8-hd", "male-qn-qingse"))
+
+    def test_free_edge_mp3_needs_no_voice_key(self):
+        def fake_synthesis(review_path, output_path, *args):
+            output_path.write_bytes(b"ID3" + b"x" * 1200)
+
+        session = web.create_session([review_row().model_dump()], [])
+        with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret", "MINIMAX_API_KEY": ""}), \
+             patch.object(web.pipeline, "synthesize_edge", side_effect=fake_synthesis) as voice:
+            web.review(web.ReviewRequest(session_id=session["session_id"], rows=[review_row(status="approved", final="你好。")]), "secret")
+            response = web.synthesize(web.SynthesizeRequest(session_id=session["session_id"], disclosure_confirmed=True), "secret")
+        self.assertTrue(web.health()["tts_backends"]["edge"])
+        self.assertEqual(response.media_type, "audio/mpeg")
+        self.assertTrue(response.body.startswith(b"ID3"))
+        self.assertEqual(voice.call_args.args[2], "zh-CN-YunxiNeural")
+
+    def test_edge_failure_returns_browser_fallback_signal(self):
+        session = web.create_session([review_row().model_dump()], [])
+        with patch.dict(os.environ, {"DEMO_ACCESS_CODE": "secret"}), \
+             patch.object(web.pipeline, "synthesize_edge", side_effect=web.pipeline.PipelineError("Edge TTS unavailable.")):
+            web.review(web.ReviewRequest(session_id=session["session_id"], rows=[review_row(status="approved", final="你好。")]), "secret")
+            with self.assertRaises(HTTPException) as caught:
+                web.synthesize(web.SynthesizeRequest(session_id=session["session_id"], disclosure_confirmed=True), "secret")
+        self.assertEqual(caught.exception.status_code, 502)
+        self.assertIn("browser preview", caught.exception.detail)
 
     def test_qa_flags_numbers_and_glossary(self):
         row = review_row().model_dump()
@@ -224,7 +248,7 @@ class WebApiTests(unittest.TestCase):
              patch.object(web.pipeline, "synthesize_minimax") as voice:
             web.review(web.ReviewRequest(session_id=session["session_id"], rows=[review_row(status="approved", final="你好。")]), "secret")
             with self.assertRaises(HTTPException) as caught:
-                web.synthesize(web.SynthesizeRequest(session_id=session["session_id"], disclosure_confirmed=True), "secret")
+                web.synthesize(web.SynthesizeRequest(session_id=session["session_id"], backend="minimax", disclosure_confirmed=True), "secret")
         self.assertEqual(caught.exception.status_code, 429)
         voice.assert_not_called()
 

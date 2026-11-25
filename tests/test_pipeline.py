@@ -1,8 +1,10 @@
 import json
 import os
 import tempfile
+import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pipeline
@@ -22,6 +24,34 @@ class PipelineTests(unittest.TestCase):
         path = Path(directory) / "review.csv"
         pipeline.write_review_csv(path, [row])
         return path
+
+    def test_free_edge_voice_uses_approved_script_and_writes_mp3(self):
+        calls = []
+
+        class FakeCommunicate:
+            def __init__(self, text, voice):
+                calls.append((text, voice))
+
+            def save_sync(self, filename):
+                Path(filename).write_bytes(b"ID3" + b"x" * 1200)
+
+        with tempfile.TemporaryDirectory() as directory, patch.dict(sys.modules, {"edge_tts": SimpleNamespace(Communicate=FakeCommunicate)}):
+            review_path = self.write_approved_review(directory)
+            output_path = Path(directory) / "voice.mp3"
+            pipeline.synthesize_edge(review_path, output_path)
+            self.assertTrue(output_path.read_bytes().startswith(b"ID3"))
+            self.assertIn("编辑确认后的中文。", calls[0][0])
+            self.assertEqual(calls[0][1], "zh-CN-YunxiNeural")
+            self.assertIn("\"tts_backend\": \"edge\"", (Path(directory) / "audit.jsonl").read_text())
+
+    def test_edge_voice_keeps_review_gate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            review_path = self.write_approved_review(directory)
+            rows = pipeline.read_review_csv(review_path)
+            rows[0]["review_status"] = "needs_review"
+            pipeline.write_review_csv(review_path, rows)
+            with self.assertRaises(pipeline.PipelineError):
+                pipeline.synthesize_edge(review_path, Path(directory) / "voice.mp3")
 
     def test_extract_segments_drops_empty_segments(self):
         result = pipeline.extract_segments(
