@@ -9,6 +9,7 @@ from __future__ import annotations
 import hmac
 import csv
 import io
+import logging
 import json
 import os
 import tempfile
@@ -226,6 +227,7 @@ async def prepare(
         if total < 1024:
             raise HTTPException(400, "Audio file is empty or too small.")
         consume_quota("prepare", "MAX_PREPARES_PER_DAY", 20)
+        stage = "transcription"
         try:
             transcript = pipeline.transcribe(
                 audio_path,
@@ -238,6 +240,7 @@ async def prepare(
                  else pipeline.API_BASE),
             )
             segments = pipeline.extract_segments(transcript)
+            stage = "translation"
             if provider == "groq":
                 translation = pipeline.translate_segments_groq(
                     segments, os.environ.get("GROQ_TRANSLATION_MODEL", "qwen/qwen3.8-27b"), glossary, key, context
@@ -252,7 +255,12 @@ async def prepare(
                 )
             rows = pipeline.build_review_rows(segments, translation)
         except pipeline.PipelineError as exc:
-            raise public_error(exc) from exc
+            logging.getLogger("podcast_localizer.provider").warning(
+                "%s %s failed: %s", provider, stage,
+                str(exc).replace(key, "[redacted]")[:800],
+            )
+            safe_error = public_error(exc)
+            raise HTTPException(safe_error.status_code, f"{stage.capitalize()} failed. {safe_error.detail}") from exc
     return create_session(rows, glossary)
 
 
