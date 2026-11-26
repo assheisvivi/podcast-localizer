@@ -6,7 +6,7 @@
   <meta name="description" content="A human-gated podcast localization workspace for international newsrooms.">
   <title>Podcast Localizer | Human-gated AI dubbing</title>
   <style>
-    :root { color-scheme: light; --ink:#172a31; --muted:#53666b; --paper:#f6f3ec; --line:#d5d9d3; --accent:#b54131; --teal:#1e625e; }
+    :root { color-scheme: light; --ink:#111111; --muted:#555555; --paper:#fafafb; --card:#ffffff; --line:#dce1e7; --accent:#0f2942; --risk:#b91c1c; --approved:#166534; }
     * { box-sizing:border-box; }
     html { scroll-behavior:smooth; }
     body { margin:0; background:var(--paper); color:var(--ink); font-family: Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; line-height:1.6; }
@@ -18,44 +18,44 @@
     .brand { font-size:14px; font-weight:800; letter-spacing:.06em; text-decoration:none; }
     nav { display:flex; gap:24px; flex-wrap:wrap; }
     nav a { font-size:14px; text-decoration:none; color:var(--muted); }
-    nav a:hover { color:var(--accent); }
+    nav a:hover { color:var(--accent); text-decoration:underline; }
     .hero { padding:100px 0 112px; display:grid; grid-template-columns:minmax(0,1.35fr) minmax(230px,.65fr); gap:64px; align-items:end; }
     .eyebrow { margin:0 0 22px; color:var(--accent); font-size:13px; font-weight:800; letter-spacing:.15em; text-transform:uppercase; }
     h1,h2,h3,p { margin-top:0; }
-    h1 { max-width:780px; margin-bottom:30px; font-size:clamp(42px,6.5vw,78px); line-height:1.14; letter-spacing:-.055em; }
-    .lead { max-width:670px; font-size:clamp(18px,2vw,22px); line-height:1.75; color:#31474d; }
-    .hero-note { border-top:3px solid var(--teal); padding-top:20px; font-size:15px; color:var(--muted); }
+    h1 { max-width:780px; margin-bottom:30px; font-size:clamp(32px,5vw,56px); line-height:1.14; letter-spacing:-.05em; }
+    .lead { max-width:670px; font-size:18px; line-height:1.75; color:var(--muted); }
+    .hero-note { border-top:3px solid var(--accent); padding-top:20px; font-size:15px; color:var(--muted); }
     .hero-note strong { display:block; color:var(--ink); margin-bottom:8px; font-size:16px; }
-    .action { display:inline-block; margin-top:22px; padding:12px 18px; background:var(--ink); color:white; text-decoration:none; font-size:14px; font-weight:700; }
-    .action:hover { background:var(--teal); }
+    .action { display:inline-block; margin-top:22px; padding:12px 18px; background:var(--accent); color:white; border:1px solid var(--accent); border-radius:6px; text-decoration:none; font-size:14px; font-weight:700; }
+    .action:hover { background:#1d4163; }
     section { padding:76px 0; border-top:1px solid var(--line); }
     .section-head { display:grid; grid-template-columns:1fr 2fr; gap:48px; margin-bottom:40px; }
-    .section-head h2 { font-size:clamp(30px,3.4vw,42px); line-height:1.2; letter-spacing:-.03em; margin-bottom:0; }
+    .section-head h2 { font-size:clamp(28px,3.4vw,36px); line-height:1.2; letter-spacing:-.03em; margin-bottom:0; }
     .section-head p { max-width:640px; margin:0; color:var(--muted); }
     .steps { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
-    .step { min-height:230px; padding:25px 20px; background:#fffdf8; border:1px solid var(--line); }
+    .step { min-height:230px; padding:25px 20px; background:var(--card); border:1px solid var(--line); border-radius:6px; }
     .step .num { display:block; color:var(--accent); font-size:13px; font-weight:800; margin-bottom:40px; }
-    .step h3 { margin-bottom:8px; font-size:19px; }
+    .step h3 { margin-bottom:8px; font-size:20px; }
     .step p { color:var(--muted); font-size:14px; margin-bottom:0; }
     .status { display:grid; grid-template-columns:1fr 1fr; gap:52px; }
-    .status h3 { font-size:21px; margin-bottom:16px; }
+    .status h3 { font-size:20px; margin-bottom:16px; }
     .status ul { padding-left:20px; margin:0; }
     .status li { margin-bottom:10px; }
-    .label { display:inline-block; margin-bottom:20px; padding:4px 10px; border:1px solid var(--teal); color:var(--teal); font-size:12px; font-weight:800; letter-spacing:.06em; }
-    .quote { padding:34px; background:#e9eee9; border-left:4px solid var(--teal); font-size:19px; line-height:1.75; }
+    .label { display:inline-block; margin-bottom:20px; padding:4px 10px; border:1px solid var(--accent); border-radius:6px; color:var(--accent); font-size:12px; font-weight:800; letter-spacing:.06em; }
+    .quote { padding:34px; background:var(--card); border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:6px; font-size:19px; line-height:1.75; }
     .quote small { display:block; margin-top:18px; color:var(--muted); font-size:13px; }
-    .next { background:var(--ink); color:#f7f3e8; }
-    .next .section-head p { color:#b9c7c6; }
+    .next { background:var(--accent); color:#ffffff; }
+    .next .section-head p { color:#ffffff; }
     .next ol { display:grid; grid-template-columns:repeat(3,1fr); gap:30px; padding-left:22px; }
     .next li { padding-left:8px; }
-    .next li::marker { color:#e5937d; font-weight:800; }
+    .next li::marker { color:#ffffff; font-weight:800; }
     footer { padding:32px 0 48px; font-size:13px; color:var(--muted); }
     @media (max-width:760px) { .hero,.section-head,.status { grid-template-columns:1fr; gap:28px; } .hero { padding:72px 0; } .steps { grid-template-columns:repeat(2,1fr); } .next ol { grid-template-columns:1fr; } }
     @media (max-width:480px) { .wrap { width:min(100% - 32px,1080px); } .nav { align-items:flex-start; flex-direction:column; justify-content:center; padding:16px 0; gap:10px; } nav { gap:16px; } .steps { grid-template-columns:1fr; } .step { min-height:auto; } .step .num { margin-bottom:18px; } section { padding:56px 0; } }
   </style>
 </head>
 <body>
-  <header><div class="wrap nav"><a class="brand" href="#top">PODCAST LOCALIZER <span style="color:var(--accent)">/ NEWSROOM MVP</span></a><nav aria-label="Page navigation"><a href="#workflow">Workflow</a><a href="#progress">What works</a><a href="#roadmap">Next steps</a><a href="app.html">Open workspace</a></nav></div></header>
+  <header><div class="wrap nav"><a class="brand" href="#top">PODCAST LOCALIZER <span style="color:var(--muted)">/ NEWSROOM MVP</span></a><nav aria-label="Page navigation"><a href="#workflow">Workflow</a><a href="#progress">What works</a><a href="#roadmap">Next steps</a><a href="app.html">Open workspace</a></nav></div></header>
   <main id="top">
     <div class="wrap hero">
       <div><p class="eyebrow">English audio → editor-approved Chinese dub</p><h1>Translate the story.<br>Keep the editor in control.</h1><p class="lead">A newsroom workspace for turning English podcast audio into a Chinese dub. AI prepares the transcript and translation, flags risky lines, and stops before synthesis until an editor approves every sentence.</p><a class="action" href="app.html">Open the review workspace</a></div>

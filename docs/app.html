@@ -6,64 +6,75 @@
   <meta name="description" content="Human-gated podcast localization review workspace.">
   <title>Review Workspace · Podcast Localizer</title>
   <style>
-    :root { --ink:#172a31; --muted:#52666b; --paper:#f6f3ec; --line:#d5d9d3; --accent:#b54131; --teal:#1e625e; }
+    :root { --ink:#111111; --muted:#555555; --paper:#fafafb; --card:#ffffff; --line:#dce1e7; --accent:#0f2942; --risk:#b91c1c; --risk-bg:#fdf2f2; --approved:#166534; --approved-bg:#f0fdf4; }
     * { box-sizing:border-box; }
     body { margin:0; background:var(--paper); color:var(--ink); font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; line-height:1.6; }
     .wrap { max-width:1100px; margin:auto; padding:0 24px; }
     header { border-bottom:1px solid var(--line); }
     header .wrap { display:flex; justify-content:space-between; align-items:center; padding-top:20px; padding-bottom:20px; gap:20px; }
-    a { color:var(--teal); }
+    a { color:var(--accent); }
     .brand { color:var(--ink); font-weight:800; text-decoration:none; }
-    h1 { font-size:clamp(32px,4.5vw,54px); line-height:1.15; letter-spacing:-.04em; margin:0 0 12px; }
-    h2 { margin:0 0 12px; font-size:23px; }
+    h1 { font-size:clamp(32px,4.5vw,48px); line-height:1.15; letter-spacing:-.04em; margin:0 0 12px; }
+    h2 { margin:0 0 12px; font-size:20px; }
     p { margin:0 0 16px; }
     .intro { padding:55px 0 28px; }
     .intro p { max-width:730px; color:var(--muted); }
-    .panel { background:#fffdf9; border:1px solid var(--line); padding:28px; margin-bottom:24px; }
+    .panel { background:var(--card); border:1px solid var(--line); border-radius:6px; padding:28px; margin-bottom:24px; }
     .grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
     label { display:block; font-size:14px; font-weight:700; margin-bottom:7px; }
-    input[type=file],input[type=password],textarea,select { width:100%; padding:11px 12px; border:1px solid #aebbb9; background:#fff; color:var(--ink); border-radius:2px; font:inherit; }
+    input[type=file],input[type=password],input[type=text],textarea,select { width:100%; padding:11px 12px; border:1px solid #87919c; background:#fff; color:var(--ink); border-radius:6px; font:inherit; }
     textarea { resize:vertical; min-height:88px; }
     .hint { color:var(--muted); font-size:13px; font-weight:400; margin-top:7px; }
     .check { display:flex; gap:10px; align-items:flex-start; margin:20px 0; font-weight:400; }
     .check input { margin-top:5px; }
-    button,.download { display:inline-block; border:0; background:var(--ink); color:#fff; padding:11px 18px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; text-decoration:none; }
-    button:hover,.download:hover { background:var(--teal); }
+    button,.download { display:inline-block; border:1px solid var(--accent); border-radius:6px; background:var(--accent); color:#fff; padding:11px 18px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; text-decoration:none; }
+    button:hover,.download:hover { background:#1d4163; color:#fff; }
+    button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
     button:disabled { opacity:.48; cursor:not-allowed; }
     .status { min-height:26px; color:var(--muted); margin-top:16px; }
-    .status.error { color:#a83226; }
-    .status.success { color:var(--teal); }
-    .progress { color:var(--teal); font-weight:700; }
-    .segment { border-top:1px solid var(--line); padding:22px 0; display:grid; grid-template-columns:110px 1fr; gap:18px; }
+    .status.error { color:var(--risk); }
+    .status.success { color:var(--approved); }
+    .review-progress { position:sticky; top:0; z-index:5; margin:18px -12px; padding:12px; background:var(--card); border:1px solid var(--line); border-radius:6px; box-shadow:0 5px 16px #0f29420d; }
+    .review-progress-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .progress { color:var(--ink); font-weight:700; margin:0; }
+    .progress-track { height:9px; margin-top:10px; border-radius:6px; background:#e9edf1; overflow:hidden; }
+    .progress-fill { width:0; height:100%; background:var(--accent); transition:width .2s ease; }
+    .review-progress.complete { border-color:var(--approved); background:var(--approved-bg); }
+    .review-progress.complete .progress { color:var(--approved); }
+    .review-progress.complete .progress-fill { background:var(--approved); }
+    .segment { border-top:1px solid var(--line); padding:22px 0; display:grid; grid-template-columns:110px 1fr; gap:18px; scroll-margin-top:120px; }
+    .segment[data-status="needs_review"] { border-left:3px solid var(--risk); padding-left:12px; }
+    .segment[data-status="approved"] { border-left:3px solid var(--approved); padding-left:12px; }
     .segment:first-child { border-top:0; }
-    .timestamp { color:var(--accent); font-size:13px; font-weight:800; }
+    .timestamp { color:var(--muted); font-size:13px; font-weight:800; }
     .original { font-size:15px; margin-bottom:12px; }
-    .draft { padding:12px 14px; background:#f1f2ed; margin-bottom:15px; color:#334b4e; }
+    .draft { padding:12px 14px; background:#f2f5f8; margin-bottom:15px; color:var(--ink); border-radius:6px; }
     .segment textarea { min-height:70px; }
     .segment .check { margin:12px 0 0; }
     .actions { display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
     .flags { display:flex; gap:7px; flex-wrap:wrap; margin-bottom:12px; }
-    .flag { background:#fff0da; color:#714710; border:1px solid #e4c794; padding:2px 8px; font-size:13px; font-weight:700; }
+    .flag { background:var(--risk-bg); color:var(--risk); border:1px solid var(--risk); border-radius:6px; padding:2px 8px; font-size:13px; font-weight:700; }
     .review-tools { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:12px 0 18px; }
     .review-tools select { width:auto; }
-    .secondary { background:#fff; border:1px solid var(--ink); color:var(--ink); }
+    .secondary,.download { background:#fff; border:1px solid var(--accent); color:var(--accent); }
+    .secondary:hover,.download:hover { background:#eef3f7; color:var(--accent); }
     audio { width:min(100%,580px); margin-top:20px; }
     [hidden] { display:none !important; }
-    @media(max-width:700px) { .grid,.segment { grid-template-columns:1fr; } .segment { gap:6px; } .panel { padding:20px; } }
+    @media(max-width:700px) { .grid,.segment { grid-template-columns:1fr; } .segment { gap:6px; } .panel { padding:20px; } .review-progress { margin:14px -8px; } .review-progress-head button { width:100%; } header .wrap { flex-wrap:wrap; } }
   </style>
 </head>
 <body>
-  <header><div class="wrap"><a class="brand" href="index.html">PODCAST LOCALIZER <span style="color:var(--accent)">/ NEWSROOM MVP</span></a><a href="index.html">Project overview</a></div></header>
+  <header><div class="wrap"><a class="brand" href="index.html">PODCAST LOCALIZER <span style="color:var(--muted)">/ NEWSROOM MVP</span></a><a href="index.html">Project overview</a></div></header>
   <main class="wrap">
     <div class="intro"><p class="hint" style="letter-spacing:.12em;font-weight:800;color:var(--accent)">EDITORIAL WORKSPACE</p><h1>Review before you dub.</h1><p>Translate a short English clip into a Chinese voiceover. Check the source and draft side by side, fix risky lines, and approve every segment before generating audio.</p></div>
     <section class="panel" aria-labelledby="upload-heading">
       <h2 id="upload-heading">1. Prepare a clip</h2>
       <div id="resume-panel" hidden><p>A saved review is available for seven days. Enter your access code to continue. Your recording is not stored; select it again below if you need to listen while editing.</p><div class="actions"><button id="resume-button" class="secondary" type="button">Continue saved review</button><label for="resume-audio-file">Reattach source audio (optional)</label><input id="resume-audio-file" type="file" accept="audio/*,.mp3,.m4a,.wav,.ogg,.webm"></div></div>
       <form id="upload-form">
-        <p><button id="classroom-button" class="secondary" type="button">Explore classroom demo</button> <span class="hint">Fictional sample · no API key or access code</span></p>
+        <p><button id="classroom-button" type="button">Explore classroom demo</button> <span class="hint">Fictional sample · no API key or access code</span></p>
         <p class="hint">The classroom demo also works on GitHub Pages. To process your own audio, open the <a href="https://podcast-localizer-live.onrender.com/app.html">hosted workspace</a> and enter the access code provided by the project owner.</p>
         <details id="live-options"><summary>Use your own audio</summary>
-        <div class="grid"><div><label for="access-code">Access code</label><input id="access-code" type="password" autocomplete="off"><div class="hint">Provided by the project owner. It is not stored in your browser.</div></div><div><label for="audio-file">English audio</label><input id="audio-file" type="file" accept="audio/*,.mp3,.m4a,.wav,.ogg,.webm"><div class="hint">Up to 4 MB; use a clip of about one minute.</div></div></div>
+        <div class="grid"><div><label for="access-code">Access code</label><input id="access-code" type="password" autocomplete="off"><div class="hint">Provided by the project owner. It is not stored in your browser.</div></div><div><label for="audio-file">English audio</label><input id="audio-file" type="file" accept="audio/*,.mp3,.m4a,.wav,.ogg,.webm"><div class="hint">Up to 20 MB; this MVP is designed for clips of about one minute. Longer clips have not been validated.</div></div></div>
         <p style="margin-top:16px"><button id="sample-button" class="secondary" type="button">Open local development sample</button></p>
         <label for="context" style="margin-top:18px">Editorial context (optional)</label><textarea id="context" maxlength="1000" placeholder="Speaker, topic, and names to check. Avoid sensitive material unless cleared for third-party processing."></textarea>
         <details><summary>Glossary for this clip</summary><p class="hint">One term per line: English term = required Chinese wording.</p><textarea id="glossary" placeholder="English term = approved Chinese wording"></textarea></details>
@@ -73,7 +84,7 @@
     </section>
     <section class="panel" id="review-panel" aria-labelledby="review-heading" hidden>
       <h2 id="review-heading">2. Editor review</h2><p>Compare each line with the source, revise the Chinese script, and approve the final wording. Flagged lines appear first.</p>
-      <audio id="source-player" controls hidden></audio><button id="speak-source" class="secondary" type="button" hidden>Play sample narration</button><p id="approval-progress" class="progress"></p><div class="review-tools"><label for="review-filter">Show</label><select id="review-filter"><option value="all">All segments</option><option value="flagged">Priority review</option><option value="pending">Not approved</option></select><button id="save-review" class="secondary" type="button">Save review</button><button id="export-audit" class="secondary" type="button">Export audit CSV</button><button id="export-history" class="secondary" type="button" hidden>Export edit history</button></div><p id="review-status" class="status" role="status"></p><div id="segments"></div>
+      <audio id="source-player" controls hidden></audio><button id="speak-source" class="secondary" type="button" hidden>Play sample narration</button><div id="review-progress" class="review-progress"><div class="review-progress-head"><p id="approval-progress" class="progress" aria-live="polite"></p><button id="jump-next" class="secondary" type="button">Next flagged or unapproved</button></div><div id="approval-meter" class="progress-track" role="progressbar" aria-label="Editor approval progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="progress-fill" class="progress-fill"></div></div></div><div class="review-tools"><label for="review-filter">Show</label><select id="review-filter"><option value="all">All segments</option><option value="flagged">Priority review</option><option value="pending">Not approved</option></select><button id="save-review" class="secondary" type="button">Save review</button><button id="export-audit" class="secondary" type="button">Export audit CSV</button><button id="export-history" class="secondary" type="button" hidden>Export edit history</button></div><p id="review-status" class="status" role="status"></p><div id="segments"></div>
     </section>
     <section class="panel" id="synthesis-panel" aria-labelledby="synthesis-heading" hidden>
       <h2 id="synthesis-heading">3. Generate the dub</h2><p id="synthesis-explainer">Voice synthesis stays locked until every line is approved. The generated file opens with an AI voice disclosure.</p>
@@ -96,14 +107,19 @@
     const setStatus = (id, message, type='') => { const el=$(id); el.textContent=message; el.className='status '+type; };
     function updateProgress() {
       const approved = rows.filter(r => r.review_status === 'approved' && r.editor_translation_zh.trim()).length;
-      $('approval-progress').textContent = `${approved} of ${rows.length} segments approved`;
+      const percent = rows.length ? Math.round(approved / rows.length * 100) : 0;
+      $('approval-progress').textContent = `Approved ${approved} / ${rows.length} segments · ${percent}%`;
+      $('approval-meter').setAttribute('aria-valuenow', String(percent));
+      $('progress-fill').style.width = `${percent}%`;
+      $('review-progress').classList.toggle('complete', rows.length > 0 && percent === 100);
+      $('jump-next').disabled = !rows.length || approved === rows.length;
       $('synthesize-button').disabled = !rows.length || approved !== rows.length || !$('disclosure').checked;
       if(approved !== rows.length && outputUrl){URL.revokeObjectURL(outputUrl);outputUrl=null;$('output-player').hidden=true;$('download-link').hidden=true;}
     }
     function renderRows() {
       const container = $('segments'); container.replaceChildren();
       rows.map((row,index)=>({row,index})).sort((a,b)=>(b.row.qa_flags?.length||0)-(a.row.qa_flags?.length||0)).forEach(({row,index}) => {
-        const section=document.createElement('section'); section.className='segment';
+        const section=document.createElement('section'); section.className='segment'; section.tabIndex=-1;
         section.dataset.flags=(row.qa_flags||[]).length ? 'flagged' : 'clear'; section.dataset.status=row.review_status;
         const time=document.createElement('div'); time.className='timestamp'; time.textContent=`${row.start_sec}–${row.end_sec} sec`;
         const content=document.createElement('div');
@@ -126,6 +142,17 @@
     }
     function applyFilter(){const filter=$('review-filter').value;document.querySelectorAll('.segment').forEach(el=>{el.hidden=filter==='flagged'&&el.dataset.flags!=='flagged'||filter==='pending'&&el.dataset.status==='approved';});}
     $('review-filter').addEventListener('change',applyFilter);
+    $('jump-next').addEventListener('click',()=>{
+      const pending=[...document.querySelectorAll('#segments .segment')].filter(el=>el.dataset.status!=='approved');
+      if(!pending.length)return;
+      const priority=pending.filter(el=>el.dataset.flags==='flagged');
+      const candidates=priority.length?priority:pending;
+      const cutoff=$('review-progress').getBoundingClientRect().bottom+8;
+      const target=candidates.find(el=>el.getBoundingClientRect().top>cutoff)||candidates[0];
+      if(target.hidden){$('review-filter').value='all';applyFilter();}
+      target.scrollIntoView({behavior:'smooth',block:'start'});
+      target.focus({preventScroll:true});
+    });
     $('disclosure').addEventListener('change',updateProgress);
     function glossaryTerms(){return $('glossary').value.split('\n').map(line=>line.split('=')).filter(parts=>parts.length>=2&&parts[0].trim()&&parts[1].trim()).map(parts=>({english:parts[0].trim(),preferred_chinese:parts.slice(1).join('=').trim(),notes:''}));}
     function showSession(data){sessionId=data.session_id;rows=data.rows;if(!classroomMode){localStorage.setItem(sessionStorageKey,sessionId);$('resume-panel').hidden=false;}$('export-history').hidden=classroomMode;if(outputUrl){URL.revokeObjectURL(outputUrl);outputUrl=null;}$('output-player').hidden=true;$('download-link').hidden=true;$('source-player').hidden=classroomMode||!sourceUrl;$('speak-source').hidden=!classroomMode;$('voice-settings').hidden=classroomMode;$('synthesis-explainer').textContent=classroomMode?'The classroom preview uses your browser voice. It does not create an MP3 or call a speech provider.':'Voice synthesis stays locked until every line is approved. The generated file opens with an AI voice disclosure.';updateVoiceAction();renderRows();$('review-panel').hidden=false;$('synthesis-panel').hidden=false;$('review-panel').scrollIntoView({behavior:'smooth'});}
@@ -150,7 +177,7 @@
     $('access-code').addEventListener('change',async()=>{try{const response=await fetch('/api/glossary',{headers:{'X-Demo-Access-Code':$('access-code').value}});if(!response.ok)return;const data=await response.json();$('glossary').value=data.terms.map(x=>`${x.english} = ${x.preferred_chinese}`).join('\n');}catch{}});
     $('upload-form').addEventListener('submit', async event => {
       event.preventDefault(); const file=$('audio-file').files[0]; if(!file){setStatus('prepare-status','Choose an audio file first.','error');return;}if(!$('access-code').value){setStatus('prepare-status','Enter an access code first.','error');return;}if(!$('authorized').checked){setStatus('prepare-status','Confirm that you have permission to process this audio.','error');return;}
-      if(file.size>4000000){setStatus('prepare-status','The file exceeds 4 MB. Please trim it first.','error');return;}
+      if(file.size>20000000){setStatus('prepare-status','The file exceeds 20 MB. Please trim or compress it first.','error');return;}
       $('prepare-button').disabled=true; setStatus('prepare-status','Transcribing and translating. Keep this page open…');
       const body=new FormData(); body.append('audio',file); body.append('context',$('context').value); body.append('authorized',$('authorized').checked?'true':'false');body.append('glossary_json',JSON.stringify(glossaryTerms()));
       try {
