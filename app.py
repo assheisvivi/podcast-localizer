@@ -29,7 +29,7 @@ import review_store
 
 
 ROOT = Path(__file__).resolve().parent
-MAX_AUDIO_BYTES = 4_000_000
+MAX_AUDIO_BYTES = 20_000_000
 ALLOWED_SUFFIXES = {".mp3", ".m4a", ".wav", ".ogg", ".webm"}
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -222,7 +222,7 @@ async def prepare(
             while chunk := await audio.read(256 * 1024):
                 total += len(chunk)
                 if total > MAX_AUDIO_BYTES:
-                    raise HTTPException(413, "Audio exceeds 4 MB. Trim the clip first.")
+                    raise HTTPException(413, "Audio exceeds 20 MB. Trim or compress the clip first.")
                 target.write(chunk)
         if total < 1024:
             raise HTTPException(400, "Audio file is empty or too small.")

@@ -4,7 +4,7 @@ A human-gated English-to-Mandarin podcast localization prototype for news produc
 
 ## Classroom demo
 
-The static site in `docs/` is designed for GitHub Pages. Open `docs/index.html` locally or publish the `main` branch's `/docs` folder with GitHub Pages. Select **Explore classroom demo** in the review workspace. The fictional sample needs no access code, API key, or backend. You can inspect risk flags, edit the Chinese script, approve each line, hear a browser voice preview, and export an audit CSV. Browser speech is a preview only; it does not produce an MP3.
+The static site in `docs/` is designed for GitHub Pages. Open `docs/index.html` locally or publish the `main` branch's `/docs` folder with GitHub Pages. Select **Explore classroom demo** in the review workspace. The fictional sample needs no access code, API key, or backend. You can inspect risk flags, edit the Chinese script, approve each line, hear a browser voice preview, and export an audit CSV. The review queue shows a sticky approval meter and a shortcut to the next flagged or unapproved line. Browser speech is a preview only; it does not produce an MP3.
 
 The existing local recording under `input/` is excluded from GitHub. It is for development, not a public classroom sample.
 
@@ -37,7 +37,7 @@ Open `http://127.0.0.1:8000/app.html`. Use **Open local development sample** wit
 - `config/glossary.csv`: default newsroom terminology.
 - `tests/`: pipeline and API checks.
 
-The live prototype handles short, single-speaker clips. A shared access code protects paid API routes. The database saves review text and edit history for seven days; uploaded audio is discarded after processing and must be reattached locally to listen after resuming a session. Paid calls have database-backed daily caps. This remains an invited-team pilot, without individual accounts or per-user attribution. The GitHub Pages demo is static and cannot call the Python API. Do not upload confidential or uncleared recordings to third-party providers.
+The live prototype is designed for short, single-speaker clips, with a 20 MB upload cap; longer recordings have not been validated end to end. Transcribed speech is wrapped as untrusted data in translation requests, and provider keys are sent only in request headers. A shared access code protects paid API routes. The database saves review text and edit history for seven days; uploaded audio is discarded after processing and must be reattached locally to listen after resuming a session. Paid calls have database-backed daily caps. This remains an invited-team pilot, without individual accounts or per-user attribution. The GitHub Pages demo is static and cannot call the Python API. Do not upload confidential or uncleared recordings to third-party providers.
 
 ## Hosted pilot
 
